@@ -1,51 +1,45 @@
-# Liberation_lang
+# bok_lang / 광복어(?)
 ***
-만든날이 광복절이라 광복어로 만듦.
+만든날이 광복절이라 bok lang(복어)로 만듦.
 
-### Main feature
-***
-* complie lang
-* static lang
-*
-
-### data type
-***
-* bool
-* i8 ~ i256
-* u8 ~ u256
-* f32 ~ f128
-* range
-* vector
-* list
-* tuple
-* json
+### feature / 특징
+* ; 없음
+* 문단 {} 로 구분
+* 타입 추론(에정)
+* smart pointer (예정)
+* 버퍼 안정성(예정)
+* utf-8 코딩(예정)
 * 
 
-### variable
+### programming paradigm / 프로그래밍 패러다임
 ***
-* \$name = \$value
-* \$name: $type = \$value
+* 절차지향 -> 함수, 객체 예정 (예정)
 
-### Memory
+### data type / 데이터 타입
 ***
-* static gc(like rust)
-* structor share
+* string
+* int
+* float
 
-### Condition
+### operator / 연산자
 ***
-* () ? \$when_true : \$when_false
-* if \$condition {}
+* \+ add 
+* \- sub
+* \* mul
+* \/ div
+* \% mod
+* \& ref
+* \* deref
+* == equal
+* != not equal
+* \<=and under
+* \>= and over
+* \< under
+* \> over
+* 
 
-### Loop
-***
-* loop {}
-* loop _ in $iter {}
-* loop $condition {}
-
-### function
-***
-* \$return_type \$function_name(\$parameter) {}
-
-### lambda
-***
-* () => {}
+### reserved words / 예약어
+* if
+* loop
+* fn
+* let
