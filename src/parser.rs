@@ -12,13 +12,19 @@ pub enum Operator {
     Assign,
     And,
     Or,
+    Not,
     AddAssign,
     SubAssign,
     MulAssign,
     DivAssign,
     AndAssign,
     OrAssign,
-    Compare,
+    Equal,
+    LT,
+    GT,
+    LTE,
+    GTE,
+    NE,
 }
 
 #[derive(Clone,Debug)]
@@ -95,8 +101,6 @@ pub struct Tokenizer {
     lexLoc: SourceLocation,
     toks: Vec<Token>,
     buf: Buffer,
-    s: String,
-    num: i64,
 }
 
 impl Tokenizer {
@@ -106,11 +110,12 @@ impl Tokenizer {
         let curLoc = SourceLocation { col: 0, line: 0 };
         let lexLoc = SourceLocation  { col: 1, line: 0 };
         let buf = Buffer { vec: Vec::new(), cur: 0};
-        Self { curLoc, lexLoc, lastChar ,toks, buf, s: String::new(), num: 0 }
+        Self { curLoc, lexLoc, lastChar ,toks, buf }
     }
 
     fn two_operator(&mut self, cur: char) -> Token {
-        if (x == '=') {
+        if (self.lastChar == '=') {
+            self.lastChar = self.advance();
             if (cur == '+') {
                 return Token::Operator(Operator::AddAssign);
             } else if (cur == '-') {
@@ -120,30 +125,42 @@ impl Tokenizer {
             } else if (cur == '/') {
                 return Token::Operator(Operator::DivAssign);
             } else if (cur == '=') {
-                return Token::Operator(Operator::Compare);
+                return Token::Operator(Operator::Equal);
             } else if (cur == '&') {
                 return Token::Operator(Operator::AndAssign);
             } else if (cur == '|') {
                 return Token::Operator(Operator::OrAssign);
+            } else if (cur == '<') {
+                return Token::Operator(Operator::LTE);
+            } else if (cur == '>') {
+                return Token::Operator(Operator::GTE);
+            } else if (cur == '!') {
+                return Token::Operator(Operator::NE);
             } else {
                 return Token::Error;
             }
         }
 
         if (cur == '+') {
-            Token::Operator(Operator::Add))
+            Token::Operator(Operator::Add)
         } else if (cur == '-') {
-            Token::Operator(Operator::Sub))
+            Token::Operator(Operator::Sub)
         } else if (cur == '*') {
-            Some(Token::Operator(Operator::Mul))
+            Token::Operator(Operator::Mul)
         } else if (cur == '/') {
-            Some(Token::Operator(Operator::Div))
+            Token::Operator(Operator::Div)
         } else if (cur == '=') {
-            Some(Token::Operator(Operator::Assign))
+            Token::Operator(Operator::Assign)
         } else if (cur == '&') {
-            Some(Token::Operator(Operator::And))
+            Token::Operator(Operator::And)
         } else if (cur == '|') {
-            Some(Token::Operator(Operator::Or))
+            Token::Operator(Operator::Or)
+        } else if (cur == '<') {
+            Token::Operator(Operator::LT)
+        } else if (cur == '>') {
+            Token::Operator(Operator::GT)
+        } else if (cur == '!') {
+            Token::Operator(Operator::Not)
         } else {
             Token::Error
         }
@@ -166,7 +183,6 @@ impl Tokenizer {
     }
 
     pub fn gettok(&mut self) -> Token {
-        
         while self.lastChar.is_ascii_whitespace() {
             self.lastChar = self.advance();
         };
@@ -174,15 +190,26 @@ impl Tokenizer {
         self.curLoc = self.lexLoc.clone();
         
         if self.lastChar.is_alphabetic() {
-            self.s = String::new();
-            self.s.push(self.lastChar);
+            let mut s = String::new();
+            s.push(self.lastChar);
             while {
                 self.lastChar = self.advance();
                 self.lastChar.is_alphanumeric()
             } {
-                self.s.push(self.lastChar);
+                s.push(self.lastChar);
             }
-            return Token::Identifier(self.s.clone());
+
+            if s == "if" {
+                return Token::ReservedWord(ReservedWord::If);
+            } else if s == "fn" {
+                return Token::ReservedWord(ReservedWord::FN);
+            } else if s == "let" {
+                return Token::ReservedWord(ReservedWord::Let);
+            } else if s == "loop" {
+                return Token::ReservedWord(ReservedWord::Loop);
+            }
+
+            return Token::Identifier(s.clone());
         }
 
         if self.lastChar.is_ascii_digit() {
@@ -197,23 +224,38 @@ impl Tokenizer {
             return Token::Type(Type::Int(s.parse().unwrap()));
         }
 
-        match self.lastChar {
-            '(' => {self.lastChar = self.advance();return Token::ReservedWord(ReservedWord::LParen);},
-            ')' => {self.lastChar = self.advance();return Token::ReservedWord(ReservedWord::RParen);},
-            '{' => {self.lastChar = self.advance();return Token::ReservedWord(ReservedWord::LBrace);},
-            '}' => {self.lastChar = self.advance();return Token::ReservedWord(ReservedWord::RBrace);},
-            _ => (),
+        if self.lastChar == '"' {
+            let mut s = String::new();
+            while {
+                self.lastChar = self.advance();
+                self.lastChar != '"'
+            } {
+                s.push(self.lastChar);
+            }
+            self.lastChar = self.advance();
+            return Token::Type(Type::Str(s.clone()));
         }
 
         match self.lastChar {
-            '+' => {self.lastChar = self.advance();return Token::Operator(Operator::Add);},
-            '-' => {self.lastChar = self.advance();return Token::Operator(Operator::Sub);},
-            '*' => {self.lastChar = self.advance();return Token::Operator(Operator::Mul);},
-            '/' => {self.lastChar = self.advance();return Token::Operator(Operator::Div);},
-            '%' => {self.lastChar = self.advance();return Token::Operator(Operator::Mod);},
-            '&' => {self.lastChar = self.advance();return Token::Operator(Operator::And);},
-            '|' => {self.lastChar = self.advance();return Token::Operator(Operator::Or);},
-            _ => (),
+            '(' => {
+                self.lastChar = self.advance();
+                return Token::ReservedWord(ReservedWord::LParen);
+            }, ')' => {
+                self.lastChar = self.advance(); 
+                return Token::ReservedWord(ReservedWord::RParen);
+            }, '{' => {
+                self.lastChar = self.advance(); 
+                return Token::ReservedWord(ReservedWord::LBrace);
+            }, '}' => {
+                self.lastChar = self.advance(); 
+                return Token::ReservedWord(ReservedWord::RBrace);
+            }, _ => (),
+        }
+
+        if "+-*/&|=<>!".contains(self.lastChar) {
+            let tmp = self.lastChar;
+            self.lastChar = self.advance();
+            return self.two_operator(tmp);
         }
 
         if self.lastChar == (0 as char) {
