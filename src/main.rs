@@ -6,6 +6,9 @@ use parser::*;
 
 fn main() {
     let mut tokenizer = Tokenizer::new();
-    let v = tokenizer.tokenize("if money > 10000 { happy = 10 } else { happy = -10 }");
-    println!("{:?}", v);
+    let t = tokenizer.tokenize("print(game)");
+    let mut parser = Parser::new();
+    let p = parser.parse(t.clone());
+    println!("{:?}", t);
+    println!("{:?}", p);
 }
