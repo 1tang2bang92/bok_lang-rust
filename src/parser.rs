@@ -37,6 +37,7 @@ pub enum Type {
 #[derive(Clone,Debug)]
 pub enum ReservedWord {
     If,
+    Else,
     Loop,
     FN,
     Let,
@@ -201,6 +202,8 @@ impl Tokenizer {
 
             if s == "if" {
                 return Token::ReservedWord(ReservedWord::If);
+            } else if s == "else" {
+                return Token::ReservedWord(ReservedWord::Else);
             } else if s == "fn" {
                 return Token::ReservedWord(ReservedWord::FN);
             } else if s == "let" {
