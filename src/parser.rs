@@ -330,7 +330,10 @@ impl Parser {
             Token::Type(x) => {
                 toks.remove(0);
                 (AST::Value(x), toks)
-            }
+            },
+            Token::ReservedWord(ReservedWord::RParen) => {
+                (AST::None, toks)
+            },
             Token::Identifier(x) => {
                 toks.remove(0);
                 if toks.is_empty() {
@@ -341,7 +344,7 @@ impl Parser {
                         toks.remove(0);
                         let (tree, mut toks) = self.statement(toks);
                         if toks.is_empty() {
-                            panic!("Expected '('");
+                            panic!("Expected ')'");
                         }
                         let tok = toks[0].clone();
                         if let Token::ReservedWord(ReservedWord::RParen) = tok {
