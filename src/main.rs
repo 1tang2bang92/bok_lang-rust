@@ -1,8 +1,13 @@
 #![allow(non_snake_case)]
 #![allow(unused)]
 
-mod parser;
-use parser::*;
+pub mod tokenizer;
+pub mod parser;
+pub mod utils;
+
+pub use tokenizer::*;
+pub use parser::*;
+pub use utils::*;
 
 fn main() {
     let mut tokenizer = Tokenizer::new();
