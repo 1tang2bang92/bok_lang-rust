@@ -51,7 +51,7 @@ impl Parser {
 
     fn parse_if_expression(&mut self) -> AST {
         let none = AST::None;
-        let condition = self.assign();
+        let condition = self.expression();
         let then = self.statement();
         let el = if self.buf.has_next() {
             let tok = self.buf.next().unwrap();
@@ -68,7 +68,7 @@ impl Parser {
     }
 
     fn parse_paran_expression(&mut self) -> AST {
-        let tree = self.assign();
+        let tree = self.expression();
         if self.buf.has_next() {
             if let Token::ReservedWord(ReservedWord::RParen) = self.buf.next().unwrap() {
                 return tree;
@@ -125,6 +125,17 @@ impl Parser {
                         panic!("Undefined Reserved Word '{:?}'", x);
                     }
                 },
+                Token::Operator(x) => match x {
+                    Operator::Add => {
+                        return self.factor();
+                    },
+                    Operator::Sub => {
+                        return AST::Operate(Operator::Sub, Box::new(AST::None), Box::new(self.factor()));
+                    },
+                    x => {
+                        panic!("Unexpected Toekn {:?}", x);
+                    }
+                },
                 _ => {
                     panic!("Token Type Error");
                 }
@@ -140,11 +151,11 @@ impl Parser {
             match tok {
                 Token::Operator(Operator::Mul) => {
                     let tree2 = self.factor();
-                    tree1 = AST::Product(Operator::Mul, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Operate(Operator::Mul, Box::new(tree1), Box::new(tree2));
                 }
                 Token::Operator(Operator::Div) => {
                     let tree2 = self.factor();
-                    tree1 = AST::Product(Operator::Div, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Operate(Operator::Div, Box::new(tree1), Box::new(tree2));
                 }
                 _ => {
                     self.buf.prev();
@@ -162,11 +173,11 @@ impl Parser {
             match tok {
                 Token::Operator(Operator::Add) => {
                     let tree2 = self.product();
-                    tree1 = AST::Sum(Operator::Add, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Operate(Operator::Add, Box::new(tree1), Box::new(tree2));
                 }
                 Token::Operator(Operator::Sub) => {
                     let tree2 = self.product();
-                    tree1 = AST::Sum(Operator::Sub, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Operate(Operator::Sub, Box::new(tree1), Box::new(tree2));
                 }
                 _ => {
                     self.buf.prev();
@@ -254,6 +265,10 @@ impl Parser {
         }
         tree1
     }
+    
+    fn expression(&mut self)  -> AST {
+        self.assign()
+    }
 
     fn statement(&mut self) -> AST {
         while self.buf.has_next() {
@@ -269,7 +284,7 @@ impl Parser {
                             }
                             _ => {
                                 self.buf.prev();
-                                let tree = self.assign();
+                                let tree = self.expression();
                                 vec.push(tree);
                             }
                         }
@@ -277,11 +292,11 @@ impl Parser {
                 }
                 _ => {
                     self.buf.prev();
-                    return self.assign();
+                    return self.expression();
                 }
             }
         }
-        self.assign()
+        self.expression()
     }
 
     pub fn parse(&mut self, toks: Vec<Token>) -> AST {
