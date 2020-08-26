@@ -14,7 +14,7 @@ impl Parser {
         Self { buf, ast }
     }
 
-    fn parse_var_expression(&mut self) -> AST {
+    fn parse_let_expression(&mut self) -> AST {
         let tok = self.buf.next().expect("Expect Identifier");
 
         let id = if let Token::Identifier(x) = tok {
@@ -26,13 +26,14 @@ impl Parser {
         let value = if self.buf.has_next() {
             let tok = self.buf.next().unwrap();
             let value = if let Token::Operator(Operator::Assign) = tok {
-                let tok = self.buf.next().unwrap();
+                /*let tok = self.buf.next().unwrap();
                 if let Token::Type(x) = tok {
                     AST::Value(x)
                 } else {
                     panic!("Expect Value");
                     AST::None
-                }
+                }*/
+                self.expression()
             } else {
                 self.buf.prev();
                 AST::None
@@ -107,7 +108,7 @@ impl Parser {
                 },
                 Token::ReservedWord(x) => match x {
                     ReservedWord::Let => {
-                        return self.parse_var_expression();
+                        return self.parse_let_expression();
                     }
                     ReservedWord::Loop => {
                         return self.parse_loop_expression();
