@@ -6,9 +6,9 @@ use parser::*;
 
 fn main() {
     let mut tokenizer = Tokenizer::new();
-    let t = tokenizer.tokenize("printgame(123)");
+    let t = tokenizer.tokenize("{1 + 2 2 + 3}");
+    println!("{:?}", t.clone());
     let mut parser = Parser::new();
-    let p = parser.parse(t.clone());
-    println!("{:?}", t);
+    let p = parser.parse(t);
     println!("{:?}", p);
 }

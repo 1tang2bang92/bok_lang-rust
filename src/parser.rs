@@ -66,34 +66,44 @@ pub enum AST {
     If(Box<AST>, Box<AST>, Box<AST>),
     Loop(Box<AST>),
     ReservedWord(ReservedWord),
+    Statement(Vec<AST>),
     None,
 }
 
-struct Buffer {
-    vec: Vec<char>,
+struct Buffer<T: Clone> {
+    vec: Vec<T>,
     cur: usize,
 }
 
-impl Buffer {
-    fn new(iter: Chars) -> Self {
-        let vec = Vec::from_iter(iter);
+impl<T: Clone> Buffer<T> {
+    fn new<U: IntoIterator<Item=T>>(iter: U) -> Self {
+        let vec: Vec<T> = Vec::from_iter(iter);
         let cur = 0;
         Self { vec, cur }
     }
-    fn next(&mut self) -> Option<char> {
+
+    fn has_next(&mut self) -> bool {
+        if self.vec.len() == self.cur {
+            false
+        } else {
+            true
+        }
+    }
+
+    fn next(&mut self) -> Option<T> {
         let item = self.vec.get(self.cur);
         self.cur += 1;
         if let Some(x) = item {
-            Some(*x)
+            Some(x.clone())
         } else {
             None
         }
     }
-    fn prev(&mut self) -> Option<char> {
+    fn prev(&mut self) -> Option<T> {
         self.cur -= 1;
         let item = self.vec.get(self.cur);
         if let Some(x) = item {
-            Some(*x)
+            Some(x.clone())
         } else {
             None
         }
@@ -111,7 +121,7 @@ pub struct Tokenizer {
     curLoc: SourceLocation,
     lexLoc: SourceLocation,
     toks: Vec<Token>,
-    buf: Buffer,
+    buf: Buffer<char>,
 }
 
 impl Tokenizer {
@@ -280,314 +290,176 @@ impl Tokenizer {
 }
 
 pub struct Parser {
+    buf: Buffer<Token>,
     ast: AST,
 }
 
 impl Parser {
     pub fn new() -> Self {
         let ast = AST::None;
-        Self { ast }
+        let buf = Buffer { vec: Vec::new() ,cur: 0 };
+        Self { buf, ast }
     }
 
-    fn factor(&mut self, mut toks: Vec<Token>) -> (AST, Vec<Token>) {
-        if toks.is_empty() {
-            return (AST::None, toks);
-        }
-        let tok = toks[0].clone();
-        match tok {
-            Token::Type(x) => {
-                toks.remove(0);
-                (AST::Value(x), toks)
-            },
-            Token::ReservedWord(ReservedWord::RParen) => {
-                (AST::None, toks)
-            },
-            Token::Identifier(x) => {
-                toks.remove(0);
-                if toks.is_empty() {
-                    (AST::Identifier(x), toks)
-                } else {
-                    let tok = toks[0].clone();
-                    if let Token::ReservedWord(ReservedWord::LParen) = tok {
-                        toks.remove(0);
-                        let (tree, mut toks) = self.statement(toks);
-                        if toks.is_empty() {
-                            panic!("Expected ')'");
+    fn factor(&mut self) -> AST {
+        while self.buf.has_next() {
+            let tok = self.buf.next().unwrap();
+            match tok {
+                Token::Type(x) => {
+                    match x {
+                        Type::Int(x) => {
+                            return AST::Value(Type::Int(x));
+                        }, _ => {
+                            panic!("Type Value Error");
                         }
-                        let tok = toks[0].clone();
-                        if let Token::ReservedWord(ReservedWord::RParen) = tok {
-                            toks.remove(0);
-                            (
-                                AST::Call(Box::new(AST::Identifier(x)), Box::new(tree)),
-                                toks,
-                            )
-                        } else {
-                            panic!("Expected ')'");
-                        }
-                    } else {
-                        (AST::Identifier(x), toks)
                     }
+                }, _ => {
+                    panic!("Token Type Error");
                 }
             }
-            Token::ReservedWord(ReservedWord::LParen) => {
-                toks.remove(0);
-                let (ast, mut toks) = self.assign(toks);
-                if toks.is_empty() {
-                    return (AST::None, toks);
-                }
-                let tok = toks[0].clone();
-                if let Token::ReservedWord(ReservedWord::RParen) = tok {
-                    toks.remove(0);
-                    (ast, toks)
-                } else {
-                    panic!("Expected ')'");
-                }
-            }
-            Token::ReservedWord(ReservedWord::Let) => {
-                toks.remove(0);
-                let (tree, toks) = self.assign(toks);
-                (AST::Let(Box::new(tree)), toks)
-            }
-            Token::ReservedWord(ReservedWord::FN) => {
-                toks.remove(0);
-                let (tree1, mut toks) = self.statement(toks);
-                let tok = toks[0].clone();
-                if let Token::ReservedWord(ReservedWord::LParen) = tok {
-                    toks.remove(0);
-                } else {
-                    panic!("Expected '('");
-                }
-                let (tree2, mut toks) = self.statement(toks);
-                if toks.is_empty() {
-                    return (AST::None, toks);
-                }
-                let tok = toks[0].clone();
-                if let Token::ReservedWord(ReservedWord::RParen) = tok {
-                    toks.remove(0);
-                } else {
-                    panic!("Expected ')'");
-                }
-                let (tree3, toks) = self.statement(toks);
-                (
-                    AST::FN(Box::new(tree1), Box::new(tree2), Box::new(tree3)),
-                    toks,
-                )
-            }
-            Token::ReservedWord(ReservedWord::If) => {
-                toks.remove(0);
-                let (tree1, toks) = self.compare(toks);
-                let (tree2, mut toks) = self.statement(toks);
-                if toks.is_empty() {
-                    return (
-                        AST::If(Box::new(tree1), Box::new(tree2), Box::new(AST::None)),
-                        toks,
-                    );
-                }
-                let tok = toks[0].clone();
-                if let Token::ReservedWord(ReservedWord::Else) = tok {
-                    toks.remove(0);
-                    let (tree3, toks) = self.statement(toks);
-                    (
-                        AST::If(Box::new(tree1), Box::new(tree2), Box::new(tree3)),
-                        toks,
-                    )
-                } else {
-                    (
-                        AST::If(Box::new(tree1), Box::new(tree2), Box::new(AST::None)),
-                        toks,
-                    )
-                }
-            }
-            Token::ReservedWord(x) => (AST::ReservedWord(x), toks),
-            _ => panic!("Parser Factor Error"),
         }
+        panic!("Factor Error")
     }
 
-    fn product(&mut self, mut toks: Vec<Token>) -> (AST, Vec<Token>) {
-        let (tree1, mut toks) = self.factor(toks);
-        if toks.is_empty() {
-            return (tree1, toks);
-        }
-        let tok = toks[0].clone();
-        match tok {
-            Token::Operator(Operator::Mul) => {
-                toks.remove(0);
-                let (tree2, toks) = self.product(toks);
-                (
-                    AST::Product(Operator::Mul, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
+    fn product(&mut self) -> AST {
+        let mut tree1 = self.factor();
+        while self.buf.has_next() {
+            let tok = self.buf.next().unwrap();
+            match tok {
+                Token::Operator(Operator::Mul) => {
+                    let tree2 = self.factor();
+                    tree1 = AST::Product(Operator::Mul, Box::new(tree1), Box::new(tree2));
+                }, Token::Operator(Operator::Div) => {
+                    let tree2 = self.factor();
+                    tree1 = AST::Product(Operator::Div, Box::new(tree1), Box::new(tree2));
+                }, _ => {
+                    self.buf.prev();
+                    return tree1;
+                },
             }
-            Token::Operator(Operator::Div) => {
-                toks.remove(0);
-                let (tree2, toks) = self.product(toks);
-                (
-                    AST::Product(Operator::Div, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
-            }
-            _ => (tree1, toks),
         }
+        tree1
     }
 
-    fn sum(&mut self, mut toks: Vec<Token>) -> (AST, Vec<Token>) {
-        let (tree1, mut toks) = self.product(toks);
-        if toks.is_empty() {
-            return (tree1, toks);
-        }
-        let tok = toks[0].clone();
-        match tok {
-            Token::Operator(Operator::Add) => {
-                toks.remove(0);
-                let (tree2, toks) = self.sum(toks);
-                (
-                    AST::Sum(Operator::Add, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
+    fn sum(&mut self) -> AST {
+        let mut tree1 = self.product();
+        while self.buf.has_next() {
+            let tok = self.buf.next().unwrap();
+            match tok {
+                Token::Operator(Operator::Add) => {
+                    let tree2 = self.product();
+                    tree1 = AST::Sum(Operator::Add, Box::new(tree1), Box::new(tree2));
+                }, Token::Operator(Operator::Sub) => {
+                    let tree2 = self.product();
+                    tree1 =  AST::Sum(Operator::Sub, Box::new(tree1), Box::new(tree2));
+                }, _ => {
+                    self.buf.prev();
+                    return tree1;
+                },
             }
-            Token::Operator(Operator::Sub) => {
-                toks.remove(0);
-                let (tree2, toks) = self.sum(toks);
-                (
-                    AST::Sum(Operator::Sub, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
-            }
-            _ => (tree1, toks),
         }
+        tree1
     }
 
-    fn bit(&mut self, mut toks: Vec<Token>) -> (AST, Vec<Token>) {
-        let (tree1, mut toks) = self.sum(toks);
-        if toks.is_empty() {
-            return (tree1, toks);
-        }
-        let tok = toks[0].clone();
-        match tok {
-            Token::Operator(Operator::And) => {
-                toks.remove(0);
-                let (tree2, toks) = self.bit(toks);
-                (
-                    AST::Bit(Operator::And, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
+    fn bit(&mut self) -> AST {
+        let mut tree1 = self.sum();
+        while self.buf.has_next() {
+            let tok = self.buf.next().unwrap();
+            match tok {
+                Token::Operator(Operator::And) => {
+                    let tree2 = self.sum();
+                    tree1 = AST::Bit(Operator::And, Box::new(tree1), Box::new(tree2));
+                }, Token::Operator(Operator::Or) => {
+                    let tree2 = self.sum();
+                    tree1 = AST::Bit(Operator::Or, Box::new(tree1), Box::new(tree2));
+                }, _ => {
+                    self.buf.prev();
+                    return tree1;
+                },
             }
-            Token::Operator(Operator::Or) => {
-                toks.remove(0);
-                let (tree2, toks) = self.bit(toks);
-                (
-                    AST::Bit(Operator::Or, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
-            }
-            _ => (tree1, toks),
         }
+        tree1
     }
 
-    fn compare(&mut self, mut toks: Vec<Token>) -> (AST, Vec<Token>) {
-        let (tree1, mut toks) = self.bit(toks);
-        if toks.is_empty() {
-            return (tree1, toks);
+    fn compare(&mut self) -> AST {
+        let tree1 = self.bit();
+        while self.buf.has_next() {
+            let tok = self.buf.next().unwrap();
+            match tok {
+                Token::Operator(Operator::Equal) => {
+                    let tree2 = self.bit();
+                    return AST::Compare(Operator::Equal, Box::new(tree1), Box::new(tree2));
+                }, Token::Operator(Operator::NE) => {
+                    let tree2 = self.bit();
+                    return AST::Compare(Operator::NE, Box::new(tree1), Box::new(tree2));
+                } ,Token::Operator(Operator::LT) => {
+                    let tree2 = self.bit();
+                    return AST::Compare(Operator::LT, Box::new(tree1), Box::new(tree2));
+                }, Token::Operator(Operator::LTE) => {
+                    let tree2 = self.bit();
+                    return AST::Compare(Operator::LTE, Box::new(tree1), Box::new(tree2));
+                }, Token::Operator(Operator::GT) => {
+                    let tree2 = self.bit();
+                    return AST::Compare(Operator::GT, Box::new(tree1), Box::new(tree2));
+                }, Token::Operator(Operator::GTE) => {
+                    let tree2 = self.bit();
+                    return AST::Compare(Operator::GTE, Box::new(tree1), Box::new(tree2));
+                }, _ => {
+                    self.buf.prev();
+                    return tree1;
+                },
+            }
         }
-        let tok = toks[0].clone();
-        match tok {
-            Token::Operator(Operator::Equal) => {
-                toks.remove(0);
-                let (tree2, toks) = self.compare(toks);
-                (
-                    AST::Compare(Operator::Equal, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
-            }
-            Token::Operator(Operator::NE) => {
-                toks.remove(0);
-                let (tree2, toks) = self.compare(toks);
-                (
-                    AST::Compare(Operator::NE, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
-            }
-            Token::Operator(Operator::LT) => {
-                toks.remove(0);
-                let (tree2, toks) = self.compare(toks);
-                (
-                    AST::Compare(Operator::LT, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
-            }
-            Token::Operator(Operator::LTE) => {
-                toks.remove(0);
-                let (tree2, toks) = self.compare(toks);
-                (
-                    AST::Compare(Operator::LTE, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
-            }
-            Token::Operator(Operator::GT) => {
-                toks.remove(0);
-                let (tree2, toks) = self.compare(toks);
-                (
-                    AST::Compare(Operator::GT, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
-            }
-            Token::Operator(Operator::GTE) => {
-                toks.remove(0);
-                let (tree2, toks) = self.compare(toks);
-                (
-                    AST::Compare(Operator::GTE, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
-            }
-            _ => (tree1, toks),
-        }
+        tree1
     }
 
-    fn assign(&mut self, mut toks: Vec<Token>) -> (AST, Vec<Token>) {
-        let (tree1, mut toks) = self.compare(toks);
-        if toks.is_empty() {
-            return (tree1, toks);
-        }
-        let tok = toks[0].clone();
-        match tok {
-            Token::Operator(Operator::Assign) => {
-                toks.remove(0);
-                let (tree2, toks) = self.assign(toks);
-                (
-                    AST::Assign(Operator::Assign, Box::new(tree1), Box::new(tree2)),
-                    toks,
-                )
+    fn assign(&mut self) -> AST {
+        let mut tree1 = self.compare();
+        while self.buf.has_next() {
+            let tok = self.buf.next().unwrap();
+            match tok {
+                Token::Operator(Operator::Assign) => {
+                    let tree2 = self.compare();
+                    tree1 = AST::Assign(Operator::Assign, Box::new(tree1), Box::new(tree2));
+                },  _ => {
+                    self.buf.prev();
+                    return tree1;
+                },
             }
-            _ => (tree1, toks),
-        }
+        }        
+        tree1
     }
 
-    fn statement(&mut self, mut toks: Vec<Token>) -> (AST, Vec<Token>) {
-        let (tree1, mut toks) = self.assign(toks);
-        if toks.is_empty() {
-            return (tree1, toks);
-        }
-        let tok = toks[0].clone();
-        match tok {
-            Token::ReservedWord(ReservedWord::LBrace) => {
-                toks.remove(0);
-                let (tree2, mut toks) = self.statement(toks);
-                let tok = toks[0].clone();
-                if let Token::ReservedWord(ReservedWord::RBrace) = tok {
-                    toks.remove(0);
-                    (tree2, toks)
-                } else {
-                    panic!("Expected '}'");
-                }
+    fn statement(&mut self) -> AST {
+        while self.buf.has_next() {
+            let tok = self.buf.next().unwrap();
+            match tok {
+                Token::ReservedWord(ReservedWord::LBrace) => {
+                    let mut vec = Vec::new();
+                    while (self.buf.has_next()) {
+                        let tok = self.buf.next().unwrap();
+                        match tok {
+                            Token::ReservedWord(ReservedWord::RBrace) => {
+                                return AST::Statement(vec);
+                            }, _ => {
+                                self.buf.prev();
+                                let tree = self.assign();
+                                vec.push(tree);
+                            }
+                        }
+                    }
+                }, _ => {
+                    self.buf.prev();
+                    return self.assign();
+                },
             }
-            _ => (tree1, toks),
-        }
+        } 
+        self.assign()
     }
 
-    pub fn parse(&mut self, mut toks: Vec<Token>) -> AST {
-        let (ast, tokss) = self.statement(toks);
-        ast
-
+    pub fn parse(&mut self, toks: Vec<Token>) -> AST {
+        self.buf = Buffer::new(toks);
+        self.statement()
         //self.ast.clone()
     }
 }
