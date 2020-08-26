@@ -39,6 +39,8 @@ pub enum ReservedWord {
     RBrace,
     Continue,
     Break,
+    Collon,
+    SemiCollon,
 }
 
 #[derive(Clone, Debug)]
@@ -62,7 +64,7 @@ pub enum AST {
     Identifier(String),
     FN(Box<AST>, Box<AST>, Box<AST>),
     Call(Box<AST>, Box<AST>),
-    Let(Box<AST>),
+    Let(Box<AST>, Box<AST>),
     If(Box<AST>, Box<AST>, Box<AST>),
     Loop(Box<AST>),
     ReservedWord(ReservedWord),
@@ -76,7 +78,7 @@ struct Buffer<T: Clone> {
 }
 
 impl<T: Clone> Buffer<T> {
-    fn new<U: IntoIterator<Item=T>>(iter: U) -> Self {
+    fn new<U: IntoIterator<Item = T>>(iter: U) -> Self {
         let vec: Vec<T> = Vec::from_iter(iter);
         let cur = 0;
         Self { vec, cur }
@@ -247,19 +249,27 @@ impl Tokenizer {
             '(' => {
                 self.lastChar = self.advance();
                 return Token::ReservedWord(ReservedWord::LParen);
-            }
+            },
             ')' => {
                 self.lastChar = self.advance();
                 return Token::ReservedWord(ReservedWord::RParen);
-            }
+            },
             '{' => {
                 self.lastChar = self.advance();
                 return Token::ReservedWord(ReservedWord::LBrace);
-            }
+            },
             '}' => {
                 self.lastChar = self.advance();
                 return Token::ReservedWord(ReservedWord::RBrace);
-            }
+            },
+            ':' => {
+                self.lastChar = self.advance();
+                return Token::ReservedWord(ReservedWord::Collon);
+            },
+            ';' => {
+                self.lastChar = self.advance();
+                return Token::ReservedWord(ReservedWord::SemiCollon);
+            },
             _ => (),
         }
 
@@ -297,28 +307,130 @@ pub struct Parser {
 impl Parser {
     pub fn new() -> Self {
         let ast = AST::None;
-        let buf = Buffer { vec: Vec::new() ,cur: 0 };
+        let buf = Buffer {
+            vec: Vec::new(),
+            cur: 0,
+        };
         Self { buf, ast }
+    }
+
+    fn parse_var_expression(&mut self) -> AST {
+        let tok = self.buf.next().expect("Expect Identifier");
+
+        let id = if let Token::Identifier(x) = tok {
+            AST::Identifier(x)
+        } else {
+            panic!("Expect Identifier");
+        };
+
+        let value = if self.buf.has_next() {
+            let tok = self.buf.next().unwrap();
+            let value = if let Token::Operator(Operator::Assign) = tok {
+                let tok = self.buf.next().unwrap();
+                if let Token::Type(x) = tok {
+                    AST::Value(x)
+                } else {
+                    panic!("Expect Value");
+                    AST::None
+                }
+            } else {
+                self.buf.prev();
+                AST::None
+            };
+            value
+        } else {
+            AST::None
+        };
+
+        AST::Let(Box::new(id), Box::new(value))
+    }
+
+    fn parse_loop_expression(&mut self) -> AST {
+        return AST::Loop(Box::new(self.statement()));
+    }
+
+    fn parse_if_expression(&mut self) -> AST {
+        let none = AST::None;
+        let condition = self.assign();
+        let then = self.statement();
+        let el = if self.buf.has_next() {
+            let tok = self.buf.next().unwrap();
+            if let Token::ReservedWord(ReservedWord::Else) = tok {
+                self.statement()
+            } else {
+                none
+            }
+        } else {
+            none
+        };
+
+        return AST::If(Box::new(condition), Box::new(then), Box::new(el));
+    }
+
+    fn parse_paran_expression(&mut self) -> AST {
+        let tree = self.assign();
+        if self.buf.has_next() {
+            if let Token::ReservedWord(ReservedWord::RParen) = self.buf.next().unwrap() {
+                return tree;
+            } else {
+                panic!("Expected ')'");
+            }
+        } else {
+            panic!("Expected ')'");
+        }
     }
 
     fn factor(&mut self) -> AST {
         while self.buf.has_next() {
             let tok = self.buf.next().unwrap();
             match tok {
-                Token::Type(x) => {
-                    match x {
-                        Type::Int(x) => {
-                            return AST::Value(Type::Int(x));
-                        }, _ => {
-                            panic!("Type Value Error");
+                Token::Identifier(x) => {
+                    if self.buf.has_next() {
+                        let tok = self.buf.next().unwrap();
+                        if let Token::ReservedWord(ReservedWord::LParen) = tok {
+                            return AST::None;
+                        } else {
+                            self.buf.prev();
+                            return AST::Identifier(x);
                         }
+                    } else {
+                        return AST::Identifier(x);
                     }
-                }, _ => {
+                },
+                Token::Type(x) => match x {
+                    Type::Int(x) => {
+                        return AST::Value(Type::Int(x));
+                    }
+                    _ => {
+                        panic!("Type Value Error");
+                    }
+                },
+                Token::ReservedWord(x) => match x {
+                    ReservedWord::Let => {
+                        return self.parse_var_expression();
+                    }
+                    ReservedWord::Loop => {
+                        return self.parse_loop_expression();
+                    }
+                    ReservedWord::RBrace => {
+                        return AST::None;
+                    }
+                    ReservedWord::LParen => {
+                        return self.parse_paran_expression();
+                    }
+                    ReservedWord::If => {
+                        return self.parse_if_expression();
+                    }
+                    x => {
+                        panic!("Undefined Reserved Word '{:?}'", x);
+                    }
+                },
+                _ => {
                     panic!("Token Type Error");
                 }
             }
         }
-        panic!("Factor Error")
+        AST::None
     }
 
     fn product(&mut self) -> AST {
@@ -329,13 +441,15 @@ impl Parser {
                 Token::Operator(Operator::Mul) => {
                     let tree2 = self.factor();
                     tree1 = AST::Product(Operator::Mul, Box::new(tree1), Box::new(tree2));
-                }, Token::Operator(Operator::Div) => {
+                }
+                Token::Operator(Operator::Div) => {
                     let tree2 = self.factor();
                     tree1 = AST::Product(Operator::Div, Box::new(tree1), Box::new(tree2));
-                }, _ => {
+                }
+                _ => {
                     self.buf.prev();
                     return tree1;
-                },
+                }
             }
         }
         tree1
@@ -349,13 +463,15 @@ impl Parser {
                 Token::Operator(Operator::Add) => {
                     let tree2 = self.product();
                     tree1 = AST::Sum(Operator::Add, Box::new(tree1), Box::new(tree2));
-                }, Token::Operator(Operator::Sub) => {
+                }
+                Token::Operator(Operator::Sub) => {
                     let tree2 = self.product();
-                    tree1 =  AST::Sum(Operator::Sub, Box::new(tree1), Box::new(tree2));
-                }, _ => {
+                    tree1 = AST::Sum(Operator::Sub, Box::new(tree1), Box::new(tree2));
+                }
+                _ => {
                     self.buf.prev();
                     return tree1;
-                },
+                }
             }
         }
         tree1
@@ -369,13 +485,15 @@ impl Parser {
                 Token::Operator(Operator::And) => {
                     let tree2 = self.sum();
                     tree1 = AST::Bit(Operator::And, Box::new(tree1), Box::new(tree2));
-                }, Token::Operator(Operator::Or) => {
+                }
+                Token::Operator(Operator::Or) => {
                     let tree2 = self.sum();
                     tree1 = AST::Bit(Operator::Or, Box::new(tree1), Box::new(tree2));
-                }, _ => {
+                }
+                _ => {
                     self.buf.prev();
                     return tree1;
-                },
+                }
             }
         }
         tree1
@@ -389,25 +507,31 @@ impl Parser {
                 Token::Operator(Operator::Equal) => {
                     let tree2 = self.bit();
                     return AST::Compare(Operator::Equal, Box::new(tree1), Box::new(tree2));
-                }, Token::Operator(Operator::NE) => {
+                }
+                Token::Operator(Operator::NE) => {
                     let tree2 = self.bit();
                     return AST::Compare(Operator::NE, Box::new(tree1), Box::new(tree2));
-                } ,Token::Operator(Operator::LT) => {
+                }
+                Token::Operator(Operator::LT) => {
                     let tree2 = self.bit();
                     return AST::Compare(Operator::LT, Box::new(tree1), Box::new(tree2));
-                }, Token::Operator(Operator::LTE) => {
+                }
+                Token::Operator(Operator::LTE) => {
                     let tree2 = self.bit();
                     return AST::Compare(Operator::LTE, Box::new(tree1), Box::new(tree2));
-                }, Token::Operator(Operator::GT) => {
+                }
+                Token::Operator(Operator::GT) => {
                     let tree2 = self.bit();
                     return AST::Compare(Operator::GT, Box::new(tree1), Box::new(tree2));
-                }, Token::Operator(Operator::GTE) => {
+                }
+                Token::Operator(Operator::GTE) => {
                     let tree2 = self.bit();
                     return AST::Compare(Operator::GTE, Box::new(tree1), Box::new(tree2));
-                }, _ => {
+                }
+                _ => {
                     self.buf.prev();
                     return tree1;
-                },
+                }
             }
         }
         tree1
@@ -419,14 +543,15 @@ impl Parser {
             let tok = self.buf.next().unwrap();
             match tok {
                 Token::Operator(Operator::Assign) => {
-                    let tree2 = self.compare();
+                    let tree2 = self.assign();
                     tree1 = AST::Assign(Operator::Assign, Box::new(tree1), Box::new(tree2));
-                },  _ => {
+                }
+                _ => {
                     self.buf.prev();
                     return tree1;
-                },
+                }
             }
-        }        
+        }
         tree1
     }
 
@@ -441,25 +566,38 @@ impl Parser {
                         match tok {
                             Token::ReservedWord(ReservedWord::RBrace) => {
                                 return AST::Statement(vec);
-                            }, _ => {
+                            }
+                            _ => {
                                 self.buf.prev();
                                 let tree = self.assign();
                                 vec.push(tree);
                             }
                         }
                     }
-                }, _ => {
+                }
+                _ => {
                     self.buf.prev();
                     return self.assign();
-                },
+                }
             }
-        } 
+        }
         self.assign()
     }
 
     pub fn parse(&mut self, toks: Vec<Token>) -> AST {
         self.buf = Buffer::new(toks);
-        self.statement()
+        let mut vec = Vec::new();
+        while self.buf.has_next() {
+            let tok = self.buf.next().unwrap();
+            if let Token::EOF = tok {
+                return AST::Statement(vec);
+            } else {
+                self.buf.prev();
+                let tree = self.statement();
+                vec.push(tree);
+            }
+        }
+        AST::Statement(vec)
         //self.ast.clone()
     }
 }
