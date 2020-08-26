@@ -13,12 +13,6 @@ pub enum Operator {
     And,
     Or,
     Not,
-    AddAssign,
-    SubAssign,
-    MulAssign,
-    DivAssign,
-    AndAssign,
-    OrAssign,
     Equal,
     LT,
     GT,
@@ -29,9 +23,7 @@ pub enum Operator {
 
 #[derive(Clone, Debug)]
 pub enum Type {
-    Str(String),
     Int(i64),
-    Float(f64),
 }
 
 #[derive(Clone, Debug)]
@@ -91,8 +83,8 @@ impl Buffer {
     fn next(&mut self) -> Option<char> {
         let item = self.vec.get(self.cur);
         self.cur += 1;
-        if item.is_some() {
-            Some(*item.unwrap())
+        if let Some(x) = item {
+            Some(*x)
         } else {
             None
         }
@@ -100,8 +92,8 @@ impl Buffer {
     fn prev(&mut self) -> Option<char> {
         self.cur -= 1;
         let item = self.vec.get(self.cur);
-        if item.is_some() {
-            Some(*item.unwrap())
+        if let Some(x) = item {
+            Some(*x)
         } else {
             None
         }
@@ -144,20 +136,8 @@ impl Tokenizer {
     fn two_operator(&mut self, cur: char) -> Token {
         if (self.lastChar == '=') {
             self.lastChar = self.advance();
-            if (cur == '+') {
-                return Token::Operator(Operator::AddAssign);
-            } else if (cur == '-') {
-                return Token::Operator(Operator::SubAssign);
-            } else if (cur == '*') {
-                return Token::Operator(Operator::MulAssign);
-            } else if (cur == '/') {
-                return Token::Operator(Operator::DivAssign);
-            } else if (cur == '=') {
+            if (cur == '=') {
                 return Token::Operator(Operator::Equal);
-            } else if (cur == '&') {
-                return Token::Operator(Operator::AndAssign);
-            } else if (cur == '|') {
-                return Token::Operator(Operator::OrAssign);
             } else if (cur == '<') {
                 return Token::Operator(Operator::LTE);
             } else if (cur == '>') {
@@ -251,18 +231,6 @@ impl Tokenizer {
                 s.push(self.lastChar);
             }
             return Token::Type(Type::Int(s.parse().unwrap()));
-        }
-
-        if self.lastChar == '"' {
-            let mut s = String::new();
-            while {
-                self.lastChar = self.advance();
-                self.lastChar != '"'
-            } {
-                s.push(self.lastChar);
-            }
-            self.lastChar = self.advance();
-            return Token::Type(Type::Str(s.clone()));
         }
 
         match self.lastChar {
