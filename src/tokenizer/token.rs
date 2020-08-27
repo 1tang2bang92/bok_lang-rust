@@ -15,6 +15,7 @@ pub enum Operator {
     LTE,
     GTE,
     NE,
+    Comma,
 }
 
 #[derive(Clone, Debug)]

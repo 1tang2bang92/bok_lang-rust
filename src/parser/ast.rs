@@ -2,14 +2,12 @@ use crate::token::*;
 
 #[derive(Clone, Debug)]
 pub enum AST {
-    Bit(Operator, Box<AST>, Box<AST>),
-    Operate(Operator, Box<AST>, Box<AST>),
-    Assign(Operator, Box<AST>, Box<AST>),
-    Compare(Operator, Box<AST>, Box<AST>),
+    Binary(Operator, Box<AST>, Box<AST>),
+    Unary(Operator, Box<AST>),
     Value(Type),
     Identifier(String),
-    FN(Box<AST>, Box<AST>, Box<AST>),
-    Call(Box<AST>, Box<AST>),
+    FN(String, Vec<AST>, Box<AST>),
+    Call(String, Vec<AST>),
     Let(Box<AST>, Box<AST>),
     If(Box<AST>, Box<AST>, Box<AST>),
     Loop(Box<AST>),

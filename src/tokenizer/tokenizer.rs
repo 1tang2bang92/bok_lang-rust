@@ -42,8 +42,6 @@ impl Tokenizer {
                 return Token::Operator(Operator::GTE);
             } else if (cur == '!') {
                 return Token::Operator(Operator::NE);
-            } else {
-                return Token::Error;
             }
         }
 
@@ -67,6 +65,8 @@ impl Tokenizer {
             Token::Operator(Operator::GT)
         } else if (cur == '!') {
             Token::Operator(Operator::Not)
+        } else if (cur == ',') {
+            Token::Operator(Operator::Comma)
         } else {
             Token::Error
         }
@@ -159,7 +159,7 @@ impl Tokenizer {
             _ => (),
         }
 
-        if "+-*/&|=<>!".contains(self.lastChar) {
+        if "+-*/&|=<>!,".contains(self.lastChar) {
             let tmp = self.lastChar;
             self.lastChar = self.advance();
             return self.two_operator(tmp);

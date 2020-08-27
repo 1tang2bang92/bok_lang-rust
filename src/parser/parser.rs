@@ -26,13 +26,6 @@ impl Parser {
         let value = if self.buf.has_next() {
             let tok = self.buf.next().unwrap();
             let value = if let Token::Operator(Operator::Assign) = tok {
-                /*let tok = self.buf.next().unwrap();
-                if let Token::Type(x) = tok {
-                    AST::Value(x)
-                } else {
-                    panic!("Expect Value");
-                    AST::None
-                }*/
                 self.expression()
             } else {
                 self.buf.prev();
@@ -81,6 +74,30 @@ impl Parser {
         }
     }
 
+    fn parse_call_expression(&mut self, s: String) -> AST {
+        let mut vec = Vec::new();
+        while self.buf.has_next() {
+            match self.buf.next().unwrap() {
+                Token::ReservedWord(ReservedWord::RParen) => {
+                    break;
+                },
+                Token::Operator(Operator::Comma) => {
+                    continue;
+                },
+                Token::Identifier(x) => {
+                    vec.push(AST::Identifier(x));
+                },
+                Token::Type(x) => {
+                    vec.push(AST::Value(x));
+                },
+                x => {
+                    panic!("Unexpected Token {:?}", x)
+                },
+            }
+        }
+        AST::Call(s, vec)
+    }
+
     fn factor(&mut self) -> AST {
         while self.buf.has_next() {
             let tok = self.buf.next().unwrap();
@@ -89,7 +106,7 @@ impl Parser {
                     if self.buf.has_next() {
                         let tok = self.buf.next().unwrap();
                         if let Token::ReservedWord(ReservedWord::LParen) = tok {
-                            return AST::None;
+                            return self.parse_call_expression(x);
                         } else {
                             self.buf.prev();
                             return AST::Identifier(x);
@@ -131,7 +148,7 @@ impl Parser {
                         return self.factor();
                     },
                     Operator::Sub => {
-                        return AST::Operate(Operator::Sub, Box::new(AST::None), Box::new(self.factor()));
+                        return AST::Unary(Operator::Sub, Box::new(self.factor()));
                     },
                     x => {
                         panic!("Unexpected Toekn {:?}", x);
@@ -152,11 +169,11 @@ impl Parser {
             match tok {
                 Token::Operator(Operator::Mul) => {
                     let tree2 = self.factor();
-                    tree1 = AST::Operate(Operator::Mul, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Binary(Operator::Mul, Box::new(tree1), Box::new(tree2));
                 }
                 Token::Operator(Operator::Div) => {
                     let tree2 = self.factor();
-                    tree1 = AST::Operate(Operator::Div, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Binary(Operator::Div, Box::new(tree1), Box::new(tree2));
                 }
                 _ => {
                     self.buf.prev();
@@ -174,11 +191,11 @@ impl Parser {
             match tok {
                 Token::Operator(Operator::Add) => {
                     let tree2 = self.product();
-                    tree1 = AST::Operate(Operator::Add, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Binary(Operator::Add, Box::new(tree1), Box::new(tree2));
                 }
                 Token::Operator(Operator::Sub) => {
                     let tree2 = self.product();
-                    tree1 = AST::Operate(Operator::Sub, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Binary(Operator::Sub, Box::new(tree1), Box::new(tree2));
                 }
                 _ => {
                     self.buf.prev();
@@ -196,11 +213,11 @@ impl Parser {
             match tok {
                 Token::Operator(Operator::And) => {
                     let tree2 = self.sum();
-                    tree1 = AST::Bit(Operator::And, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Binary(Operator::And, Box::new(tree1), Box::new(tree2));
                 }
                 Token::Operator(Operator::Or) => {
                     let tree2 = self.sum();
-                    tree1 = AST::Bit(Operator::Or, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Binary(Operator::Or, Box::new(tree1), Box::new(tree2));
                 }
                 _ => {
                     self.buf.prev();
@@ -218,27 +235,27 @@ impl Parser {
             match tok {
                 Token::Operator(Operator::Equal) => {
                     let tree2 = self.bit();
-                    return AST::Compare(Operator::Equal, Box::new(tree1), Box::new(tree2));
+                    return AST::Binary(Operator::Equal, Box::new(tree1), Box::new(tree2));
                 }
                 Token::Operator(Operator::NE) => {
                     let tree2 = self.bit();
-                    return AST::Compare(Operator::NE, Box::new(tree1), Box::new(tree2));
+                    return AST::Binary(Operator::NE, Box::new(tree1), Box::new(tree2));
                 }
                 Token::Operator(Operator::LT) => {
                     let tree2 = self.bit();
-                    return AST::Compare(Operator::LT, Box::new(tree1), Box::new(tree2));
+                    return AST::Binary(Operator::LT, Box::new(tree1), Box::new(tree2));
                 }
                 Token::Operator(Operator::LTE) => {
                     let tree2 = self.bit();
-                    return AST::Compare(Operator::LTE, Box::new(tree1), Box::new(tree2));
+                    return AST::Binary(Operator::LTE, Box::new(tree1), Box::new(tree2));
                 }
                 Token::Operator(Operator::GT) => {
                     let tree2 = self.bit();
-                    return AST::Compare(Operator::GT, Box::new(tree1), Box::new(tree2));
+                    return AST::Binary(Operator::GT, Box::new(tree1), Box::new(tree2));
                 }
                 Token::Operator(Operator::GTE) => {
                     let tree2 = self.bit();
-                    return AST::Compare(Operator::GTE, Box::new(tree1), Box::new(tree2));
+                    return AST::Binary(Operator::GTE, Box::new(tree1), Box::new(tree2));
                 }
                 _ => {
                     self.buf.prev();
@@ -256,7 +273,7 @@ impl Parser {
             match tok {
                 Token::Operator(Operator::Assign) => {
                     let tree2 = self.assign();
-                    tree1 = AST::Assign(Operator::Assign, Box::new(tree1), Box::new(tree2));
+                    tree1 = AST::Binary(Operator::Assign, Box::new(tree1), Box::new(tree2));
                 }
                 _ => {
                     self.buf.prev();
