@@ -128,7 +128,7 @@ impl Tokenizer {
             } {
                 s.push(self.lastChar);
             }
-            return Token::Type(Type::Int(s.parse().unwrap()));
+            return Token::Value(Type::Int, Value::Int(s.parse().unwrap()));
         }
 
         match self.lastChar {

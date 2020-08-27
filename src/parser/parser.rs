@@ -18,7 +18,7 @@ impl Parser {
         let tok = self.buf.next().expect("Expect Identifier");
 
         let id = if let Token::Identifier(x) = tok {
-            AST::Identifier(x)
+            x
         } else {
             panic!("Expect Identifier");
         };
@@ -36,7 +36,55 @@ impl Parser {
             AST::None
         };
 
-        AST::Let(Box::new(id), Box::new(value))
+        AST::Variable(id, Type::None, Box::new(value))
+    }
+
+    fn parse_fn_expression(&mut self) -> AST {
+        let tok = self.buf.next().expect("Expect Identifier");
+
+        let id = if let Token::Identifier(x) = tok {
+            x
+        } else {
+            panic!("Expect Identifier");
+        };
+
+        let tok = self.buf.next().expect("Expect LParen");
+        if let Token::ReservedWord(ReservedWord::LParen) = tok {
+        } else {
+            panic!("Expect LParen");
+        };
+
+        let mut vec = Vec::new();
+        let mut id = String::new();
+        let mut ty = Type::None;
+        let mut colon = false;
+        while self.buf.has_next() {
+            match self.buf.next().unwrap() {
+                Token::ReservedWord(ReservedWord::RParen) => {
+                    vec.push(AST::Variable(id.clone(), ty.clone(), Box::new(AST::None)));
+                    break;
+                },
+                Token::Operator(Operator::Comma) => {
+                    vec.push(AST::Variable(id.clone(), ty.clone(), Box::new(AST::None)));
+                    colon = false;
+                },
+                Token::Identifier(x) => {
+                    if (colon == false) {
+                        id = x;
+                        ty = Type::None;
+                    } else {
+                        ty = Type::Id(x);
+                    }
+                },
+                Token::ReservedWord(ReservedWord::Collon) => {
+                    colon = true;
+                },
+                x => {
+                    panic!("Unexpected Token {:?}", x)
+                },
+            }
+        }
+        AST::Function(id, vec, Box::new(self.statement()))
     }
 
     fn parse_loop_expression(&mut self) -> AST {
@@ -87,8 +135,8 @@ impl Parser {
                 Token::Identifier(x) => {
                     vec.push(AST::Identifier(x));
                 },
-                Token::Type(x) => {
-                    vec.push(AST::Value(x));
+                Token::Value(Type::Int, x) => {
+                    vec.push(AST::Value(Type::Int, x));
                 },
                 x => {
                     panic!("Unexpected Token {:?}", x)
@@ -115,33 +163,34 @@ impl Parser {
                         return AST::Identifier(x);
                     }
                 },
-                Token::Type(x) => match x {
-                    Type::Int(x) => {
-                        return AST::Value(Type::Int(x));
-                    }
-                    _ => {
-                        panic!("Type Value Error");
-                    }
+                Token::Value(Type::Int, x) => {
+                    return AST::Value(Type::Int, x);
                 },
                 Token::ReservedWord(x) => match x {
                     ReservedWord::Let => {
                         return self.parse_let_expression();
-                    }
+                    },
+                    ReservedWord::FN => {
+                        return self.parse_fn_expression();
+                    },
                     ReservedWord::Loop => {
                         return self.parse_loop_expression();
-                    }
+                    },
                     ReservedWord::RBrace => {
                         return AST::None;
-                    }
+                    },
                     ReservedWord::LParen => {
                         return self.parse_paran_expression();
-                    }
+                    },
                     ReservedWord::If => {
                         return self.parse_if_expression();
-                    }
+                    },
+                    ReservedWord::SemiCollon => {
+                        return self.factor();
+                    },
                     x => {
                         panic!("Undefined Reserved Word '{:?}'", x);
-                    }
+                    },
                 },
                 Token::Operator(x) => match x {
                     Operator::Add => {
@@ -152,11 +201,11 @@ impl Parser {
                     },
                     x => {
                         panic!("Unexpected Toekn {:?}", x);
-                    }
+                    },
                 },
                 _ => {
                     panic!("Token Type Error");
-                }
+                },
             }
         }
         AST::None
@@ -192,15 +241,15 @@ impl Parser {
                 Token::Operator(Operator::Add) => {
                     let tree2 = self.product();
                     tree1 = AST::Binary(Operator::Add, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 Token::Operator(Operator::Sub) => {
                     let tree2 = self.product();
                     tree1 = AST::Binary(Operator::Sub, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 _ => {
                     self.buf.prev();
                     return tree1;
-                }
+                },
             }
         }
         tree1
@@ -214,15 +263,15 @@ impl Parser {
                 Token::Operator(Operator::And) => {
                     let tree2 = self.sum();
                     tree1 = AST::Binary(Operator::And, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 Token::Operator(Operator::Or) => {
                     let tree2 = self.sum();
                     tree1 = AST::Binary(Operator::Or, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 _ => {
                     self.buf.prev();
                     return tree1;
-                }
+                },
             }
         }
         tree1
@@ -236,31 +285,31 @@ impl Parser {
                 Token::Operator(Operator::Equal) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::Equal, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 Token::Operator(Operator::NE) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::NE, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 Token::Operator(Operator::LT) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::LT, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 Token::Operator(Operator::LTE) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::LTE, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 Token::Operator(Operator::GT) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::GT, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 Token::Operator(Operator::GTE) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::GTE, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 _ => {
                     self.buf.prev();
                     return tree1;
-                }
+                },
             }
         }
         tree1
@@ -274,11 +323,11 @@ impl Parser {
                 Token::Operator(Operator::Assign) => {
                     let tree2 = self.assign();
                     tree1 = AST::Binary(Operator::Assign, Box::new(tree1), Box::new(tree2));
-                }
+                },
                 _ => {
                     self.buf.prev();
                     return tree1;
-                }
+                },
             }
         }
         tree1
@@ -299,19 +348,19 @@ impl Parser {
                         match tok {
                             Token::ReservedWord(ReservedWord::RBrace) => {
                                 return AST::Statement(vec);
-                            }
+                            },
                             _ => {
                                 self.buf.prev();
                                 let tree = self.expression();
                                 vec.push(tree);
-                            }
+                            },
                         }
                     }
-                }
+                },
                 _ => {
                     self.buf.prev();
                     return self.expression();
-                }
+                },
             }
         }
         self.expression()

@@ -4,14 +4,13 @@ use crate::token::*;
 pub enum AST {
     Binary(Operator, Box<AST>, Box<AST>),
     Unary(Operator, Box<AST>),
-    Value(Type),
+    Value(Type, Value),
     Identifier(String),
-    FN(String, Vec<AST>, Box<AST>),
+    Function(String, Vec<AST>, Box<AST>),
     Call(String, Vec<AST>),
-    Let(Box<AST>, Box<AST>),
+    Variable(String, Type, Box<AST>),
     If(Box<AST>, Box<AST>, Box<AST>),
     Loop(Box<AST>),
-    ReservedWord(ReservedWord),
     Statement(Vec<AST>),
     None,
 }

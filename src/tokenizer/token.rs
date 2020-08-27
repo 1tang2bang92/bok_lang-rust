@@ -20,7 +20,15 @@ pub enum Operator {
 
 #[derive(Clone, Debug)]
 pub enum Type {
+    Int,
+    Id(String),
+    None,
+}
+
+#[derive(Clone, Debug)]
+pub enum Value {
     Int(i64),
+    None,
 }
 
 #[derive(Clone, Debug)]
@@ -43,7 +51,7 @@ pub enum ReservedWord {
 #[derive(Clone, Debug)]
 pub enum Token {
     Operator(Operator),
-    Type(Type),
+    Value(Type, Value),
     ReservedWord(ReservedWord),
     Identifier(String),
     EOF,
