@@ -1,6 +1,6 @@
+use crate::ast::*;
 use crate::buffer::*;
 use crate::token::*;
-use crate::ast::*;
 
 pub struct Parser {
     buf: Buffer<Token>,
@@ -63,11 +63,11 @@ impl Parser {
                 Token::ReservedWord(ReservedWord::RParen) => {
                     vec.push(AST::Variable(id.clone(), ty.clone(), Box::new(AST::None)));
                     break;
-                },
+                }
                 Token::Operator(Operator::Comma) => {
                     vec.push(AST::Variable(id.clone(), ty.clone(), Box::new(AST::None)));
                     colon = false;
-                },
+                }
                 Token::Identifier(x) => {
                     if (colon == false) {
                         id = x;
@@ -75,13 +75,11 @@ impl Parser {
                     } else {
                         ty = Type::Id(x);
                     }
-                },
+                }
                 Token::ReservedWord(ReservedWord::Collon) => {
                     colon = true;
-                },
-                x => {
-                    panic!("Unexpected Token {:?}", x)
-                },
+                }
+                x => panic!("Unexpected Token {:?}", x),
             }
         }
         AST::Function(id, vec, Box::new(self.statement()))
@@ -128,19 +126,15 @@ impl Parser {
             match self.buf.next().unwrap() {
                 Token::ReservedWord(ReservedWord::RParen) => {
                     break;
-                },
+                }
                 Token::Operator(Operator::Comma) => {
                     continue;
-                },
-                Token::Identifier(x) => {
-                    vec.push(AST::Identifier(x));
-                },
-                Token::Value(Type::Int, x) => {
-                    vec.push(AST::Value(Type::Int, x));
-                },
-                x => {
-                    panic!("Unexpected Token {:?}", x)
-                },
+                }
+                _ => {
+                    self.buf.prev();
+                    vec.push(self.expression());
+                    //panic!("Unexpected Token {:?}", x)
+                }
             }
         }
         AST::Call(s, vec)
@@ -162,50 +156,50 @@ impl Parser {
                     } else {
                         return AST::Identifier(x);
                     }
-                },
+                }
                 Token::Value(Type::Int, x) => {
                     return AST::Value(Type::Int, x);
-                },
+                }
                 Token::ReservedWord(x) => match x {
                     ReservedWord::Let => {
                         return self.parse_let_expression();
-                    },
+                    }
                     ReservedWord::FN => {
                         return self.parse_fn_expression();
-                    },
+                    }
                     ReservedWord::Loop => {
                         return self.parse_loop_expression();
-                    },
+                    }
                     ReservedWord::RBrace => {
                         return AST::None;
-                    },
+                    }
                     ReservedWord::LParen => {
                         return self.parse_paran_expression();
-                    },
+                    }
                     ReservedWord::If => {
                         return self.parse_if_expression();
-                    },
+                    }
                     ReservedWord::SemiCollon => {
-                        return self.factor();
-                    },
+                        continue;
+                    }
                     x => {
                         panic!("Undefined Reserved Word '{:?}'", x);
-                    },
+                    }
                 },
                 Token::Operator(x) => match x {
                     Operator::Add => {
                         return self.factor();
-                    },
+                    }
                     Operator::Sub => {
                         return AST::Unary(Operator::Sub, Box::new(self.factor()));
-                    },
+                    }
                     x => {
                         panic!("Unexpected Toekn {:?}", x);
-                    },
+                    }
                 },
                 _ => {
                     panic!("Token Type Error");
-                },
+                }
             }
         }
         AST::None
@@ -241,15 +235,15 @@ impl Parser {
                 Token::Operator(Operator::Add) => {
                     let tree2 = self.product();
                     tree1 = AST::Binary(Operator::Add, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 Token::Operator(Operator::Sub) => {
                     let tree2 = self.product();
                     tree1 = AST::Binary(Operator::Sub, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 _ => {
                     self.buf.prev();
                     return tree1;
-                },
+                }
             }
         }
         tree1
@@ -263,15 +257,15 @@ impl Parser {
                 Token::Operator(Operator::And) => {
                     let tree2 = self.sum();
                     tree1 = AST::Binary(Operator::And, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 Token::Operator(Operator::Or) => {
                     let tree2 = self.sum();
                     tree1 = AST::Binary(Operator::Or, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 _ => {
                     self.buf.prev();
                     return tree1;
-                },
+                }
             }
         }
         tree1
@@ -285,31 +279,31 @@ impl Parser {
                 Token::Operator(Operator::Equal) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::Equal, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 Token::Operator(Operator::NE) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::NE, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 Token::Operator(Operator::LT) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::LT, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 Token::Operator(Operator::LTE) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::LTE, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 Token::Operator(Operator::GT) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::GT, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 Token::Operator(Operator::GTE) => {
                     let tree2 = self.bit();
                     return AST::Binary(Operator::GTE, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 _ => {
                     self.buf.prev();
                     return tree1;
-                },
+                }
             }
         }
         tree1
@@ -323,17 +317,17 @@ impl Parser {
                 Token::Operator(Operator::Assign) => {
                     let tree2 = self.assign();
                     tree1 = AST::Binary(Operator::Assign, Box::new(tree1), Box::new(tree2));
-                },
+                }
                 _ => {
                     self.buf.prev();
                     return tree1;
-                },
+                }
             }
         }
         tree1
     }
-    
-    fn expression(&mut self)  -> AST {
+
+    fn expression(&mut self) -> AST {
         self.assign()
     }
 
@@ -348,19 +342,19 @@ impl Parser {
                         match tok {
                             Token::ReservedWord(ReservedWord::RBrace) => {
                                 return AST::Statement(vec);
-                            },
+                            }
                             _ => {
                                 self.buf.prev();
                                 let tree = self.expression();
                                 vec.push(tree);
-                            },
+                            }
                         }
                     }
-                },
+                }
                 _ => {
                     self.buf.prev();
                     return self.expression();
-                },
+                }
             }
         }
         self.expression()

@@ -1,5 +1,5 @@
-use crate::token::*;
 use crate::buffer::*;
+use crate::token::*;
 
 #[derive(Clone, Debug)]
 struct SourceLocation {
@@ -135,27 +135,27 @@ impl Tokenizer {
             '(' => {
                 self.lastChar = self.advance();
                 return Token::ReservedWord(ReservedWord::LParen);
-            },
+            }
             ')' => {
                 self.lastChar = self.advance();
                 return Token::ReservedWord(ReservedWord::RParen);
-            },
+            }
             '{' => {
                 self.lastChar = self.advance();
                 return Token::ReservedWord(ReservedWord::LBrace);
-            },
+            }
             '}' => {
                 self.lastChar = self.advance();
                 return Token::ReservedWord(ReservedWord::RBrace);
-            },
+            }
             ':' => {
                 self.lastChar = self.advance();
                 return Token::ReservedWord(ReservedWord::Collon);
-            },
+            }
             ';' => {
                 self.lastChar = self.advance();
                 return Token::ReservedWord(ReservedWord::SemiCollon);
-            },
+            }
             _ => (),
         }
 

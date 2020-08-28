@@ -1,4 +1,5 @@
 use crate::token::*;
+use inkwell::values::*;
 
 #[derive(Clone, Debug)]
 pub enum AST {
@@ -14,3 +15,5 @@ pub enum AST {
     Statement(Vec<AST>),
     None,
 }
+
+impl AST {}

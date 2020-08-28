@@ -4,15 +4,24 @@
 use std::fs::File;
 use std::io::prelude::*;
 
-pub mod tokenizer;
+use inkwell::builder::*;
+use inkwell::context::*;
+
+pub mod generator;
 pub mod parser;
+pub mod tokenizer;
 pub mod utils;
 
-pub use tokenizer::*;
+pub use generator::*;
 pub use parser::*;
+pub use tokenizer::*;
 pub use utils::*;
 
 fn main() {
+    let context = Context::create();
+
+    let mut generator = Generator::new(&context, context.create_builder());
+
     let mut f = File::open("test.bs").expect("File Open Error");
 
     let mut fs = String::new();
@@ -24,5 +33,7 @@ fn main() {
     println!("{:?}", t.clone());
     let mut parser = Parser::new();
     let p = parser.parse(t);
-    println!("{:?}", p);
+    println!("{:?}", p.clone());
+
+    generator.gen_code(p);
 }
