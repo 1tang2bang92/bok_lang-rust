@@ -1,17 +1,20 @@
-use crate::buffer::*;
-use crate::token::*;
+use bok_utils::*;
+use bok_tokenizer::*;
 use crate::ast::*;
 
 pub struct Parser {
     buf: Buffer<Token>,
-    ast: AST,
+    //ast: AST,
 }
 
 impl Parser {
     pub fn new() -> Self {
-        let ast = AST::None;
+        //let ast = AST::None;
         let buf = Buffer::default();
-        Self { buf, ast }
+        Self { 
+            buf, 
+            //ast, 
+        }
     }
 
     fn parse_let_expression(&mut self) -> AST {
@@ -55,22 +58,22 @@ impl Parser {
         };
 
         let mut vec = Vec::new();
-        let mut id = String::new();
+        let mut vid = String::new();
         let mut ty = Type::None;
         let mut colon = false;
         while self.buf.has_next() {
             match self.buf.next().unwrap() {
                 Token::ReservedWord(ReservedWord::RParen) => {
-                    vec.push(AST::Variable(id.clone(), ty.clone(), Box::new(AST::None)));
+                    vec.push(AST::Variable(vid.clone(), ty.clone(), Box::new(AST::None)));
                     break;
                 },
                 Token::Operator(Operator::Comma) => {
-                    vec.push(AST::Variable(id.clone(), ty.clone(), Box::new(AST::None)));
+                    vec.push(AST::Variable(vid.clone(), ty.clone(), Box::new(AST::None)));
                     colon = false;
                 },
                 Token::Identifier(x) => {
-                    if (colon == false) {
-                        id = x;
+                    if colon == false {
+                        vid = x;
                         ty = Type::None;
                     } else {
                         ty = Type::Id(x);
@@ -343,7 +346,7 @@ impl Parser {
             match tok {
                 Token::ReservedWord(ReservedWord::LBrace) => {
                     let mut vec = Vec::new();
-                    while (self.buf.has_next()) {
+                    while self.buf.has_next() {
                         let tok = self.buf.next().unwrap();
                         match tok {
                             Token::ReservedWord(ReservedWord::RBrace) => {

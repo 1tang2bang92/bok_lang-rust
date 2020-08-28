@@ -1,4 +1,4 @@
-use crate::token::*;
+use bok_tokenizer::*;
 
 #[derive(Clone, Debug)]
 pub enum AST {

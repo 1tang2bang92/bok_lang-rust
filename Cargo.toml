@@ -1,0 +1,17 @@
+[workspace]
+members = [
+    "",
+]
+
+[package]
+name = "Liberation_lang"
+version = "0.1.0"
+authors = ["root"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bok-utils = { path = "bok-utils" }
+bok-tokenizer = { path = "bok-tokenizer" }
+bok-parser = { path = "bok-parser" }

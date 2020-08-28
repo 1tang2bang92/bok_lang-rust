@@ -4,13 +4,8 @@
 use std::fs::File;
 use std::io::prelude::*;
 
-pub mod tokenizer;
-pub mod parser;
-pub mod utils;
-
-pub use tokenizer::*;
-pub use parser::*;
-pub use utils::*;
+use bok_tokenizer::*;
+use bok_parser::*;
 
 fn main() {
     let mut f = File::open("test.bs").expect("File Open Error");
