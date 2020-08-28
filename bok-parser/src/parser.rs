@@ -135,14 +135,9 @@ impl Parser {
                 Token::Operator(Operator::Comma) => {
                     continue;
                 },
-                Token::Identifier(x) => {
-                    vec.push(AST::Identifier(x));
-                },
-                Token::Value(Type::Int, x) => {
-                    vec.push(AST::Value(Type::Int, x));
-                },
-                x => {
-                    panic!("Unexpected Token {:?}", x)
+                _ => {
+                    self.buf.prev();
+                    vec.push(self.expression());
                 },
             }
         }
