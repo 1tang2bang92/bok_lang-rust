@@ -1,3 +1,4 @@
 let temp1 = 10
 let temp2 = 10
-temp1 + temp2
+let temp3 = 10
+temp1 = temp1 + temp2 + temp3

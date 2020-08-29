@@ -49,13 +49,13 @@ impl<'a> Generator<'a> {
             self.named_values.insert(name.clone(), Box::new(variable));
         self.named_values.get(&name).unwrap()
         } else {
-            let variable = self.module.add_global(self.context.i64_type(), Some(AddressSpace::Const), &name);
+            let variable = self.module.add_global(self.context.i64_type(), Some(AddressSpace::Global), &name);
             let variable = variable.as_pointer_value();
             let body = self.gen_code(e);
             let val = body.as_any_value_enum().into_int_value().get_sign_extended_constant().unwrap();
             self.builder.build_store(variable, self.context.i64_type().const_int(val as u64, true));
             self.named_values.insert(name.clone(), Box::new(variable));
-        self.named_values.get(&name).unwrap()
+            self.named_values.get(&name).unwrap()
         }
     }
 
@@ -72,19 +72,37 @@ impl<'a> Generator<'a> {
         self.tmp_values.last().unwrap()
     }
 
-    fn gen_binary_code(&mut self, op: Operator, l: AST, r: AST) -> &Box<dyn AnyValue<'a> + 'a> {
-        let lhs: IntValue<'a> = self.gen_code(l).as_any_value_enum().into_int_value();
-        let rhs: IntValue<'a> = self.gen_code(r).as_any_value_enum().into_int_value();
+    fn gen_pointer_code(&mut self, ast: AST) -> PointerValue<'a> {
+        if let AST::Identifier(x) = ast {
+            let v = self.named_values.get(&x);
+            let v = v.unwrap().as_any_value_enum().into_pointer_value();
+            v
+        } else {
+            panic!("Exptected Identifier")
+        }
+    }
 
-        let val: IntValue<'a> = match op {
-            Operator::Add => self.builder.build_int_add(lhs, rhs, "addtmp"),
-            Operator::Sub => self.builder.build_int_sub(lhs, rhs, "subtmp"),
-            Operator::Mul => self.builder.build_int_mul(lhs, rhs, "multmp"),
-            Operator::Div => self.builder.build_int_signed_div(lhs, rhs, "divtmp"),
-            _ => panic!(""),
-        };
-        self.tmp_values.push(Box::new(val));
-        self.tmp_values.last().unwrap()
+    fn gen_binary_code(&mut self, op: Operator, l: AST, r: AST) -> &Box<dyn AnyValue<'a> + 'a> {
+        if let Operator::Assign = op.clone() {
+            let lhs: PointerValue<'a> = self.gen_pointer_code(l);
+            let rhs: IntValue<'a> = self.gen_code(r).as_any_value_enum().into_int_value();
+            self.builder.build_store(lhs, rhs);
+            self.tmp_values.push(Box::new(rhs));
+            self.tmp_values.last().unwrap()
+        } else {
+            let lhs: IntValue<'a> = self.gen_code(l).as_any_value_enum().into_int_value();
+            let rhs: IntValue<'a> = self.gen_code(r).as_any_value_enum().into_int_value();
+    
+            let val: IntValue<'a> = match op {
+                Operator::Add => self.builder.build_int_add(lhs, rhs, "addtmp"),
+                Operator::Sub => self.builder.build_int_sub(lhs, rhs, "subtmp"),
+                Operator::Mul => self.builder.build_int_mul(lhs, rhs, "multmp"),
+                Operator::Div => self.builder.build_int_signed_div(lhs, rhs, "divtmp"),
+                _ => panic!(""),
+            };
+            self.tmp_values.push(Box::new(val));
+            self.tmp_values.last().unwrap()
+        }        
     }
 
     pub fn gen_code(&mut self, ast: AST) -> &Box<dyn AnyValue<'a> + 'a> {
