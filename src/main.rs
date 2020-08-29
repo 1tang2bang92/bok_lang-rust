@@ -35,5 +35,5 @@ fn main() {
     let p = parser.parse(t);
     println!("{:?}", p.clone());
 
-    generator.gen_code(p);
+    println!("{:?}",generator.gen_code(p).as_any_value_enum().into_int_value().get_sign_extended_constant());
 }

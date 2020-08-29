@@ -16,4 +16,11 @@ pub enum AST {
     None,
 }
 
-impl AST {}
+impl AST {
+    pub fn is_none(&self) -> bool{
+        match self {
+            AST::None => true,
+            _ => false,
+        }
+    }
+}
