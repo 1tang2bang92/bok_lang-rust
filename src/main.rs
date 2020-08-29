@@ -20,7 +20,7 @@ pub use utils::*;
 fn main() {
     let context = Context::create();
 
-    let mut generator = Generator::new(&context, context.create_builder());
+    let mut generator = Generator::new(&context, context.create_builder(), context.create_module("Entry"));
 
     let mut f = File::open("test.bs").expect("File Open Error");
 
@@ -35,5 +35,5 @@ fn main() {
     let p = parser.parse(t);
     println!("{:?}", p.clone());
 
-    println!("{:?}",generator.gen_code(p).as_any_value_enum().into_int_value().get_sign_extended_constant());
+    println!("{:?}",generator.gen_code(p).as_any_value_enum());
 }
