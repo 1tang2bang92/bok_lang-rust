@@ -64,7 +64,7 @@ impl<'a> Generator<'a> {
         match ast {
             AST::Binary(op, l, r) => self.gen_binary_code(op, *l, *r),
             AST::Identifier(x) => self.gen_identifier_code(x),
-            AST::Variable(name, _, value) => self.gen_var_code(name, *value),
+            //AST::Variable(name, _, value) => self.gen_var_code(name, *value),
             AST::Value(Type::Int, Value::Int(x)) => self.gen_val_code(x),
             AST::Statement(x) => {
                 let mut a = unsafe {(self as *mut Self).as_mut().unwrap()}.gen_val_code(0);
