@@ -1,2 +1,9 @@
-let a = 10
-let b = 20
+fn test(a) {
+    if a == 0 {
+        0
+    } else if a == 1 {
+        1
+    } else {
+        2
+    }
+}
