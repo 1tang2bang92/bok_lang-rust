@@ -4,8 +4,10 @@
 use std::fs::File;
 use std::io::prelude::*;
 
+use inkwell::*;
 use inkwell::builder::*;
 use inkwell::context::*;
+use inkwell::targets::*;
 
 pub mod generator;
 pub mod parser;
@@ -34,6 +36,21 @@ fn main() {
     let mut parser = Parser::new();
     let p = parser.parse(t);
     println!("{:?}", p.clone());
+    generator.gen_code(p);
+    //println!("{:?}",generator.gen_code(p).as_any_value_enum().into_pointer_value().print_to_string());
 
-    println!("{:?}",generator.gen_code(p).as_any_value_enum());
+    let mut module = generator.get_module();
+    /*let triple = TargetMachine::get_default_triple();
+    let triple = TargetTriple::create("x86_64-pc-win32");
+    module.set_triple(&triple);
+
+    let target = Target::from_triple(&triple).unwrap();
+    
+    let cpu = "generic";
+    let features = "";
+    let level = OptimizationLevel::Default;
+    let reloc_mode = RelocMode::Default;
+    let code_model = CodeModel::Default;
+    let targetmachine = target.create_target_machine(&triple, cpu, features, level, reloc_mode, code_model).unwrap();*/
+    println!("{:?}", module.print_to_string());
 }
