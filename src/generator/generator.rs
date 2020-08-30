@@ -5,6 +5,7 @@ use crate::Operator;
 use crate::Type;
 use crate::Value;
 
+use inkwell::*;
 use inkwell::builder::*;
 use inkwell::context::*;
 use inkwell::values::*;
@@ -74,9 +75,14 @@ impl<'a> Generator<'a> {
 
     fn gen_identifier_code(&mut self, s: String) -> &Box<dyn AnyValue<'a> + 'a> {
         let v = self.named_values.get(&s);
-        let v = v.unwrap().as_any_value_enum().into_pointer_value();
-        self.tmp_values.push(Box::new(self.builder.build_load(v, &s)));
-        self.tmp_values.last().unwrap()
+        let ave = v.unwrap().as_any_value_enum();
+        if ave.is_pointer_value() {
+            let pv = ave.into_pointer_value();
+            self.tmp_values.push(Box::new(self.builder.build_load(pv, &s)));
+            self.tmp_values.last().unwrap()
+        } else {
+            v.unwrap()
+        }
     }
 
     fn gen_pointer_code(&mut self, ast: AST) -> PointerValue<'a> {
@@ -105,6 +111,7 @@ impl<'a> Generator<'a> {
                 Operator::Sub => self.builder.build_int_sub(lhs, rhs, "subtmp"),
                 Operator::Mul => self.builder.build_int_mul(lhs, rhs, "multmp"),
                 Operator::Div => self.builder.build_int_signed_div(lhs, rhs, "divtmp"),
+                Operator::Equal => self.builder.build_int_compare(IntPredicate::EQ, lhs, rhs, "comptmp"),
                 _ => panic!(""),
             };
             self.tmp_values.push(Box::new(val));
@@ -113,24 +120,94 @@ impl<'a> Generator<'a> {
     }
 
     fn gen_function_code(&mut self, name: String, vars: Vec<AST>, body: AST) -> &Box<dyn AnyValue<'a> + 'a> {
-        let function_type = self.context.i64_type().fn_type(&[BasicTypeEnum::IntType(self.context.i64_type()), BasicTypeEnum::IntType(self.context.i64_type())], true);
+
+        let mut arr = Vec::new();
+        for x in 0 .. vars.len() {
+            arr.push(BasicTypeEnum::IntType(self.context.i64_type()));
+        }
+
+        let function_type = self.context.i64_type().fn_type(arr.as_slice(), true);
 
         let function = self.module.add_function(&name, function_type, Some(Linkage::Internal));
 
         let basic_block = self.context.append_basic_block(function, "entry");
         self.builder.position_at_end(basic_block);
 
-        /*let args = Vec::new();
 
+        let mut args = Vec::new();
         for x in vars {
             if let AST::Variable(id, _, _) = x{
-                
+                args.push(id);
             }
-        }*/
+        }
+
+        let mut idx = 0;
+        for x in function.get_param_iter() {
+            x.set_name(&args[idx]);
+            idx += 1;
+        }
+        idx = 0;
+        self.named_values.clear();
+        for x in function.get_param_iter() {
+            self.named_values.insert(args[idx].clone(), Box::new(x));
+            idx += 1;
+        }
 
         let ret_val = self.gen_code(body).as_any_value_enum().into_int_value();
         self.builder.build_return(Some(&ret_val));
         self.tmp_values.push(Box::new(function));
+        self.tmp_values.last().unwrap()
+    }
+
+    fn gen_call_code(&mut self, name: String, vars: Vec<AST>) -> &Box<dyn AnyValue<'a> + 'a> {
+        let function = self.module.get_function(&name).unwrap();
+
+        if function.get_params().len() != vars.len() {
+
+        }
+        let mut arr = Vec::new();
+        for x in vars {
+            arr.push(BasicValueEnum::IntValue(self.gen_code(x).as_any_value_enum().into_int_value()));
+        }
+
+        self.tmp_values.push(Box::new(self.builder.build_call(function, arr.as_slice(), "calltmp")));
+        self.tmp_values.last().unwrap()
+    }
+
+    fn gen_if_code(&mut self, condition: AST, then: AST, el: AST) -> &Box<dyn AnyValue<'a> + 'a> {
+        let cond = self.gen_code(condition).as_any_value_enum().into_int_value();
+        let cond = self.builder.build_int_compare(IntPredicate::NE, cond, self.context.bool_type().const_zero(), "ifcondition");
+
+        let function = self.builder.get_insert_block().unwrap().get_parent().unwrap();
+        let then_block = self.context.append_basic_block(function, "then");
+        let else_block = self.context.append_basic_block(function, "else");
+        let merge_block = self.context.append_basic_block(function, "murge");
+        self.builder.build_conditional_branch(cond, then_block, else_block);
+
+
+        self.builder.position_at_end(then_block);
+        let thenv = unsafe {(self as *mut Self).as_mut().unwrap()}.gen_code(then);
+        
+
+        self.builder.build_unconditional_branch(merge_block);
+        
+
+        let mut elsev = None;
+        if !el.is_none() {
+            unsafe {(self as *mut Self).as_mut().unwrap()}.builder.position_at_end(else_block);
+            elsev = Some(unsafe {(self as *mut Self).as_mut().unwrap()}.gen_code(el));
+            self.builder.build_unconditional_branch(merge_block);
+        }
+
+        self.builder.position_at_end(merge_block);
+        let phi = self.builder.build_phi(self.context.i64_type(), "iftmp");
+        phi.add_incoming(&[(&thenv.as_any_value_enum().into_int_value(), then_block)]);
+
+        if elsev.is_some() {
+            phi.add_incoming(&[(&elsev.unwrap().as_any_value_enum().into_int_value(), else_block)]);
+        }
+
+        self.tmp_values.push(Box::new(phi));
         self.tmp_values.last().unwrap()
     }
 
@@ -141,6 +218,8 @@ impl<'a> Generator<'a> {
             AST::Variable(name, _, value) => self.gen_var_code(name, *value),
             AST::Value(Type::Int, Value::Int(x)) => self.gen_val_code(x),
             AST::Function(name, vars, body) => self.gen_function_code(name, vars, *body),
+            AST::Call(name, vars) => self.gen_call_code(name, vars),
+            AST::If(cond, then, el) => self.gen_if_code(*cond, *then, *el),
             AST::Statement(x) => {
                 let mut a = unsafe {(self as *mut Self).as_mut().unwrap()}.gen_val_code(0);
                 for i in x {

@@ -55,22 +55,22 @@ impl Parser {
         };
 
         let mut vec = Vec::new();
-        let mut id = String::new();
+        let mut vid = String::new();
         let mut ty = Type::None;
         let mut colon = false;
         while self.buf.has_next() {
             match self.buf.next().unwrap() {
                 Token::ReservedWord(ReservedWord::RParen) => {
-                    vec.push(AST::Variable(id.clone(), ty.clone(), Box::new(AST::None)));
+                    vec.push(AST::Variable(vid.clone(), ty.clone(), Box::new(AST::None)));
                     break;
                 }
                 Token::Operator(Operator::Comma) => {
-                    vec.push(AST::Variable(id.clone(), ty.clone(), Box::new(AST::None)));
+                    vec.push(AST::Variable(vid.clone(), ty.clone(), Box::new(AST::None)));
                     colon = false;
                 }
                 Token::Identifier(x) => {
                     if (colon == false) {
-                        id = x;
+                        vid = x;
                         ty = Type::None;
                     } else {
                         ty = Type::Id(x);
@@ -98,6 +98,7 @@ impl Parser {
             if let Token::ReservedWord(ReservedWord::Else) = tok {
                 self.statement()
             } else {
+                self.buf.prev();
                 none
             }
         } else {
