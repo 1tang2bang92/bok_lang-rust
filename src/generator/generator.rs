@@ -189,6 +189,7 @@ impl<'a> Generator<'a> {
         let thenv = unsafe {(self as *mut Self).as_mut().unwrap()}.gen_code(then);
         self.builder.build_unconditional_branch(merge_block);
 
+        let then_block = self.builder.get_insert_block().unwrap();
 
         let mut elsev = None;
         if !el.is_none() {
@@ -196,6 +197,8 @@ impl<'a> Generator<'a> {
             elsev = Some(unsafe {(self as *mut Self).as_mut().unwrap()}.gen_code(el));
         }
         self.builder.build_unconditional_branch(merge_block);
+
+        let else_block = self.builder.get_insert_block().unwrap();
         
         self.builder.position_at_end(merge_block);
         let phi = self.builder.build_phi(self.context.i64_type(), "iftmp");
