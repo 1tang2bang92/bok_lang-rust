@@ -2,7 +2,7 @@
 #![allow(unused)]
 
 use std::fs::File;
-use std::io::prelude::*;
+use std::{ffi::CString, io::prelude::*};
 
 use inkwell::*;
 use inkwell::builder::*;
@@ -41,7 +41,9 @@ fn main() {
 
     let mut module = generator.get_module();
     /*let triple = TargetMachine::get_default_triple();
-    let triple = TargetTriple::create("x86_64-pc-win32");
+    let triple = TargetTriple::create("x86_64-unknown-linux-gnu");
+    println!("{:?}", &triple);
+
     module.set_triple(&triple);
 
     let target = Target::from_triple(&triple).unwrap();

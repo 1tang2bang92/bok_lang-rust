@@ -180,32 +180,33 @@ impl<'a> Generator<'a> {
 
         let function = self.builder.get_insert_block().unwrap().get_parent().unwrap();
         let then_block = self.context.append_basic_block(function, "then");
-        let else_block = self.context.append_basic_block(function, "else");
-        let merge_block = self.context.append_basic_block(function, "murge");
-        self.builder.build_conditional_branch(cond, then_block, else_block);
+        let else_block = self.context.insert_basic_block_after(then_block, "else");
+        let merge_block = self.context.insert_basic_block_after(else_block, "murge");
 
+        self.builder.build_conditional_branch(cond, then_block, else_block);
 
         self.builder.position_at_end(then_block);
         let thenv = unsafe {(self as *mut Self).as_mut().unwrap()}.gen_code(then);
-        
-
         self.builder.build_unconditional_branch(merge_block);
-        
+
 
         let mut elsev = None;
         if !el.is_none() {
             unsafe {(self as *mut Self).as_mut().unwrap()}.builder.position_at_end(else_block);
             elsev = Some(unsafe {(self as *mut Self).as_mut().unwrap()}.gen_code(el));
-            self.builder.build_unconditional_branch(merge_block);
         }
-
+        self.builder.build_unconditional_branch(merge_block);
+        
         self.builder.position_at_end(merge_block);
         let phi = self.builder.build_phi(self.context.i64_type(), "iftmp");
-        phi.add_incoming(&[(&thenv.as_any_value_enum().into_int_value(), then_block)]);
 
         if elsev.is_some() {
-            phi.add_incoming(&[(&elsev.unwrap().as_any_value_enum().into_int_value(), else_block)]);
+            let elsev = elsev.unwrap();
+            phi.add_incoming(&[(&elsev.as_any_value_enum().into_int_value(), else_block)]);
+        } else {
+            phi.add_incoming(&[(&self.context.i64_type().const_zero(), else_block)]);
         }
+        phi.add_incoming(&[(&thenv.as_any_value_enum().into_int_value(), then_block)]);
 
         self.tmp_values.push(Box::new(phi));
         self.tmp_values.last().unwrap()
