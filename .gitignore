@@ -1,6 +1,8 @@
 /target
 Cargo.lock
 Cargo.toml
+llvm-10.0.1
+test.rs
 
 #Added by cargo
 #
