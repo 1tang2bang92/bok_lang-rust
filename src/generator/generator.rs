@@ -18,7 +18,7 @@ pub struct Generator<'a> {
     context: &'a Context,
     builder: Builder<'a>,
     module: Module<'a>,
-    named_values: HashMap<String, Box<dyn AnyValue<'a> + 'a>>,
+    named_values: HashMap<String, PointerValue<'a>>,
     tmp_values: Vec<Box<dyn AnyValue<'a> + 'a>>,
 }
 
@@ -33,7 +33,7 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn create_entry_block_alloca(&mut self, function: &FunctionValue, var_name: &String) -> PointerValue<'a> {
+    fn create_entry_block_alloca(&mut self, function: &FunctionValue, var_name: &str) -> PointerValue<'a> {
         let mut bb = function.get_first_basic_block().unwrap();
         let fi = bb.get_first_instruction();
         if fi.is_some() {
@@ -45,66 +45,48 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn gen_var_code(&mut self, name: String, e: AST) -> &Box<dyn AnyValue<'a> + 'a> {
+    fn gen_var_code(&mut self, name: &str, e: AST) -> IntValue<'a> {
         let basic_block_option = self.builder.get_insert_block();
         if basic_block_option.is_some() {
             let bastic_block = basic_block_option.unwrap();
             let function = bastic_block.get_parent().unwrap();
-            let variable = self.create_entry_block_alloca(&function, &name);
+            let variable = self.create_entry_block_alloca(&function, name);
             let body = self.gen_code(e);
             let val = body.as_any_value_enum().into_int_value();
             self.builder.build_store(variable, val);
-            self.named_values.insert(name.clone(), Box::new(variable));
-            self.named_values.get(&name).unwrap()
+            self.named_values.insert(name.to_string(), variable);
+            self.builder.build_load(variable, name).into_int_value()
         } else {
-            let variable = self.module.add_global(self.context.i64_type(), Some(AddressSpace::Global), &name);
-            let variable = variable.as_pointer_value();
-            let body = self.gen_code(e);
-            let val = body.as_any_value_enum().into_int_value();
-            self.builder.build_store(variable, val);
-            self.named_values.insert(name.clone(), Box::new(variable));
-            self.named_values.get(&name).unwrap()
+            panic!("Variable Location Error");
         }
     }
 
-    fn gen_val_code(&mut self, data: i64) -> &Box<dyn AnyValue<'a> + 'a> {
-        let val: IntValue<'a> = self.context.i64_type().const_int(data as u64, true);
-        self.tmp_values.push(Box::new(val));
-        self.tmp_values.last().unwrap()
+    fn gen_val_code(&mut self, data: i64) -> IntValue<'a> {
+        self.context.i64_type().const_int(data as u64, true)
     }
 
-    fn gen_identifier_code(&mut self, s: String) -> &Box<dyn AnyValue<'a> + 'a> {
-        let v = self.named_values.get(&s);
-        let ave = v.unwrap().as_any_value_enum();
-        if ave.is_pointer_value() {
-            let pv = ave.into_pointer_value();
-            self.tmp_values.push(Box::new(self.builder.build_load(pv, &s)));
-            self.tmp_values.last().unwrap()
-        } else {
-            v.unwrap()
-        }
+    fn gen_identifier_code(&mut self, name: &str) -> IntValue<'a> {
+        let pv = self.named_values.get(name).unwrap();
+        self.builder.build_load(*pv, name).into_int_value()
     }
 
     fn gen_pointer_code(&mut self, ast: AST) -> PointerValue<'a> {
         if let AST::Identifier(x) = ast {
-            let v = self.named_values.get(&x);
-            let v = v.unwrap().as_any_value_enum().into_pointer_value();
-            v
+            *self.named_values.get(&x).unwrap()
         } else {
             panic!("Exptected Identifier")
         }
     }
 
-    fn gen_binary_code(&mut self, op: Operator, l: AST, r: AST) -> &Box<dyn AnyValue<'a> + 'a> {
+    fn gen_binary_code(&mut self, op: Operator, l: AST, r: AST) -> IntValue<'a> {
         if let Operator::Assign = op.clone() {
             let lhs: PointerValue<'a> = self.gen_pointer_code(l);
-            let rhs: IntValue<'a> = self.gen_code(r).as_any_value_enum().into_int_value();
+            let rhs: IntValue<'a> = self.gen_code(r);
             self.builder.build_store(lhs, rhs);
-            self.tmp_values.push(Box::new(rhs));
-            self.tmp_values.last().unwrap()
+            rhs
         } else {
-            let lhs: IntValue<'a> = self.gen_code(l).as_any_value_enum().into_int_value();
-            let rhs: IntValue<'a> = self.gen_code(r).as_any_value_enum().into_int_value();
+            let lhs: IntValue<'a> = self.gen_code(l);
+            let rhs: IntValue<'a> = self.gen_code(r);
     
             let val: IntValue<'a> = match op {
                 Operator::Add => self.builder.build_int_add(lhs, rhs, "addtmp"),
@@ -114,12 +96,11 @@ impl<'a> Generator<'a> {
                 Operator::Equal => self.builder.build_int_compare(IntPredicate::EQ, lhs, rhs, "comptmp"),
                 _ => panic!(""),
             };
-            self.tmp_values.push(Box::new(val));
-            self.tmp_values.last().unwrap()
+            val
         }        
     }
 
-    fn gen_function_code(&mut self, name: String, vars: Vec<AST>, body: AST) -> &Box<dyn AnyValue<'a> + 'a> {
+    fn gen_function_code(&mut self, name: &str, vars: Vec<AST>, body: AST) -> IntValue<'a> {
 
         let mut arr = Vec::new();
         for x in 0 .. vars.len() {
@@ -141,25 +122,26 @@ impl<'a> Generator<'a> {
             }
         }
 
-        let mut idx = 0;
-        for x in function.get_param_iter() {
-            x.set_name(&args[idx]);
-            idx += 1;
-        }
-        idx = 0;
-        self.named_values.clear();
-        for x in function.get_param_iter() {
-            self.named_values.insert(args[idx].clone(), Box::new(x));
-            idx += 1;
+        for (idx, param) in function.get_param_iter().enumerate() {
+            param.set_name(&args[idx]);
         }
 
-        let ret_val = self.gen_code(body).as_any_value_enum().into_int_value();
+        self.named_values.clear();
+        for (idx, param) in function.get_param_iter().enumerate() {
+            let arg_name = args[idx].as_str();
+            let alloca = self.create_entry_block_alloca(&function, arg_name);
+
+            self.builder.build_store(alloca, param);
+
+            self.named_values.insert(args[idx].clone(), alloca);
+        }
+
+        let ret_val = self.gen_code(body);
         self.builder.build_return(Some(&ret_val));
-        self.tmp_values.push(Box::new(function));
-        self.tmp_values.last().unwrap()
+        ret_val
     }
 
-    fn gen_call_code(&mut self, name: String, vars: Vec<AST>) -> &Box<dyn AnyValue<'a> + 'a> {
+    fn gen_call_code(&mut self, name: &str, vars: Vec<AST>) -> IntValue<'a> {
         let function = self.module.get_function(&name).unwrap();
 
         if function.get_params().len() != vars.len() {
@@ -170,11 +152,10 @@ impl<'a> Generator<'a> {
             arr.push(BasicValueEnum::IntValue(self.gen_code(x).as_any_value_enum().into_int_value()));
         }
 
-        self.tmp_values.push(Box::new(self.builder.build_call(function, arr.as_slice(), "calltmp")));
-        self.tmp_values.last().unwrap()
+        self.builder.build_call(function, arr.as_slice(), "calltmp").as_any_value_enum().into_int_value()
     }
 
-    fn gen_if_code(&mut self, condition: AST, then: AST, el: AST) -> &Box<dyn AnyValue<'a> + 'a> {
+    fn gen_if_code(&mut self, condition: AST, then: AST, el: AST) -> IntValue<'a> {
         let cond = self.gen_code(condition).as_any_value_enum().into_int_value();
         let cond = self.builder.build_int_compare(IntPredicate::NE, cond, self.context.bool_type().const_zero(), "ifcondition");
 
@@ -211,18 +192,17 @@ impl<'a> Generator<'a> {
         }
         phi.add_incoming(&[(&thenv.as_any_value_enum().into_int_value(), then_block)]);
 
-        self.tmp_values.push(Box::new(phi));
-        self.tmp_values.last().unwrap()
+        phi.as_basic_value().into_int_value()
     }
 
-    pub fn gen_code(&mut self, ast: AST) -> &Box<dyn AnyValue<'a> + 'a> {
+    pub fn gen_code(&mut self, ast: AST) -> IntValue<'a> {
         match ast {
             AST::Binary(op, l, r) => self.gen_binary_code(op, *l, *r),
-            AST::Identifier(x) => self.gen_identifier_code(x),
-            AST::Variable(name, _, value) => self.gen_var_code(name, *value),
+            AST::Identifier(name) => self.gen_identifier_code(&name),
+            AST::Variable(name, _, value) => self.gen_var_code(&name, *value),
             AST::Value(Type::Int, Value::Int(x)) => self.gen_val_code(x),
-            AST::Function(name, vars, body) => self.gen_function_code(name, vars, *body),
-            AST::Call(name, vars) => self.gen_call_code(name, vars),
+            AST::Function(name, vars, body) => self.gen_function_code(&name, vars, *body),
+            AST::Call(name, vars) => self.gen_call_code(&name, vars),
             AST::If(cond, then, el) => self.gen_if_code(*cond, *then, *el),
             AST::Statement(x) => {
                 let mut a = unsafe {(self as *mut Self).as_mut().unwrap()}.gen_val_code(0);

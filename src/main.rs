@@ -70,13 +70,13 @@ fn main() {
 
     if display_compiler_output {
         let mut module = generator.get_module();
+        module.print_to_file("output.ir");
         println!("{:?}", module.print_to_string());
     }
-    /*let triple = TargetMachine::get_default_triple();
-    let triple = TargetTriple::create("x86_64-unknown-linux-gnu");
-    println!("{:?}", &triple);
 
-    module.set_triple(&triple);
+    /*let triple = TargetMachine::get_default_triple();
+    //let triple = TargetTriple::create("x86_64-unknown-linux-gnu");
+    println!("{:?}", &triple);
 
     let target = Target::from_triple(&triple).unwrap();
     let cpu = "generic";

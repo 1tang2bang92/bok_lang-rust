@@ -1,0 +1,32 @@
+; ModuleID = 'Entry'
+source_filename = "Entry"
+
+define internal i64 @main(i64 %0, ...) {
+entry:
+  %1 = alloca i64
+  store i64 %0, i64* %1
+  ret i64 0
+}
+
+define internal i64 @test(i64 %a, ...) {
+entry:
+  %b = alloca i64
+  %a2 = load i64, i64* %a1
+  %comptmp = icmp eq i64 %a2, 0
+  %ifcondition = icmp ne i1 %comptmp, false
+  br i1 %ifcondition, label %then, label %else
+  %a1 = alloca i64
+  store i64 %a, i64* %a1
+
+then:                                             ; preds = %entry
+  br label %murge
+
+else:                                             ; preds = %entry
+  br label %murge
+
+murge:                                            ; preds = %else, %then
+  %iftmp = phi i64 [ 0, %else ], [ 1, %then ]
+  store i64 %iftmp, i64* %b
+  %b3 = load i64, i64* %b
+  ret i64 %b3
+}

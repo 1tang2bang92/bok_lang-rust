@@ -1,13 +1,7 @@
+fn main() {
+    
+}
+
 fn test(a) {
-    if a == 0 {
-        0
-    } else if a == 1 {
-        1
-    } else if a == 2{
-        2
-    } else if a == 3 {
-        3
-    } else {
-        4
-    }
+    let b = if a == 0 1 else 0
 }
