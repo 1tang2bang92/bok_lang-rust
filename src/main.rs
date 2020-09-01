@@ -26,6 +26,7 @@ fn main() {
     let mut display_lexer_output = false;
     let mut display_parser_output = false;
     let mut display_compiler_output = false;
+    let mut display_object_output = false;
 
     //match complite option on terminal
     for arg in std::env::args() {
@@ -33,6 +34,7 @@ fn main() {
             "--dl" => display_lexer_output = true,
             "--dp" => display_parser_output = true,
             "--dc" => display_compiler_output = true,
+            "--do" => display_object_output = true,
             _ => (),
         }
     }
@@ -83,38 +85,49 @@ fn main() {
 
     if display_compiler_output {
         let mut module = generator.get_module();
-        module.print_to_file("output.ir");
+        module.print_to_file("output.ll");
         module.print_to_stderr();
     }
 
-    let triple = TargetMachine::get_default_triple();
-    generator.get_module().set_triple(&triple);
-    //let triple = TargetTriple::create("x86_64-unknown-linux-gnu");
-    //println!("{:?}", &triple);
+    if display_object_output {
+        let triple = TargetMachine::get_default_triple();
+        generator.get_module().set_triple(&triple);
+        //let triple = TargetTriple::create("x86_64-unknown-linux-gnu");
+        //println!("{:?}", &triple);
 
-    let config = InitializationConfig {
-        asm_parser: true,
-        asm_printer: true,
-        base: true,
-        disassembler: true,
-        info: true,
-        machine_code: true,
-    };
-    Target::initialize_native(&config);
+        let config = InitializationConfig {
+            asm_parser: true,
+            asm_printer: true,
+            base: true,
+            disassembler: true,
+            info: true,
+            machine_code: true,
+        };
+        Target::initialize_native(&config);
 
-    let target = Target::from_triple(&triple).unwrap();
-    let cpu = "generic";
-    let features = "";
-    let level = OptimizationLevel::Default;
-    let reloc_mode = RelocMode::Default;
-    let code_model = CodeModel::Default;
-    let targetmachine = target
-        .create_target_machine(&triple, cpu, features, level, reloc_mode, code_model)
-        .unwrap();
+        let target = Target::from_triple(&triple).unwrap();
+        let cpu = "generic";
+        let features = "";
+        let level = OptimizationLevel::Default;
+        let reloc_mode = RelocMode::Default;
+        let code_model = CodeModel::Default;
+        let targetmachine = target
+            .create_target_machine(&triple, cpu, features, level, reloc_mode, code_model)
+            .unwrap();
 
-    let engin = generator.get_module().create_jit_execution_engine(OptimizationLevel::Default).unwrap();
-    let target_data = engin.get_target_data();
-    generator.get_module().set_data_layout(&target_data.get_data_layout());
-    targetmachine.add_analysis_passes(generator.get_passmanager());
-    targetmachine.write_to_file(generator.get_module(), FileType::Object, Path::new("output.o"));
+        let engin = generator
+            .get_module()
+            .create_jit_execution_engine(OptimizationLevel::Default)
+            .unwrap();
+        let target_data = engin.get_target_data();
+        generator
+            .get_module()
+            .set_data_layout(&target_data.get_data_layout());
+        targetmachine.add_analysis_passes(generator.get_passmanager());
+        targetmachine.write_to_file(
+            generator.get_module(),
+            FileType::Object,
+            Path::new("output.o"),
+        );
+    }
 }

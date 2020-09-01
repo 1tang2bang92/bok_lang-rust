@@ -114,6 +114,8 @@ impl Tokenizer {
                 return Token::ReservedWord(ReservedWord::Let);
             } else if s == "loop" {
                 return Token::ReservedWord(ReservedWord::Loop);
+            } else if s == "break" {
+                return Token::ReservedWord(ReservedWord::Break);
             }
 
             return Token::Identifier(s.clone());

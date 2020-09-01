@@ -174,6 +174,9 @@ impl Parser {
                     ReservedWord::RBrace => {
                         return AST::None;
                     }
+                    ReservedWord::Break => {
+                        return AST::Break;
+                    }
                     ReservedWord::LParen => {
                         return self.parse_paran_expression();
                     }

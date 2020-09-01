@@ -208,8 +208,8 @@ impl<'a> Generator<'a> {
         if !el.is_none() {
             self.builder.position_at_end(else_block);
             elsev = Some(self.gen_code(el));
+            self.builder.build_unconditional_branch(merge_block);
         }
-        self.builder.build_unconditional_branch(merge_block);
 
         let else_block = self.builder.get_insert_block().unwrap();
 
@@ -227,6 +227,38 @@ impl<'a> Generator<'a> {
         phi.as_basic_value().into_int_value()
     }
 
+    fn gen_loop_code(&mut self, expr: AST) -> IntValue<'a> {
+        let function = self
+            .builder
+            .get_insert_block()
+            .unwrap()
+            .get_parent()
+            .unwrap();
+        let loop_block = self.context.append_basic_block(function, "loop");
+        //let end_loop_block = self.context.append_basic_block(function, "endloop");
+        self.builder.position_at_end(loop_block);
+
+        self.gen_code(expr);
+        self.builder.build_unconditional_branch(loop_block);
+
+        
+        self.context.i64_type().const_zero()
+    }
+
+    fn gen_break_code(&mut self) -> IntValue<'a> {
+        let function = self
+            .builder
+            .get_insert_block()
+            .unwrap()
+            .get_parent()
+            .unwrap();
+        let end_loop_block = self.context.append_basic_block(function, "endloop");
+        //let end_loop_block = function.get_basic_blocks().;
+
+        self.builder.build_unconditional_branch(end_loop_block);
+        self.context.i64_type().const_zero()
+    }
+
     pub fn gen_code(&mut self, ast: AST) -> IntValue<'a> {
         match ast {
             AST::Binary(op, l, r) => self.gen_binary_code(op, *l, *r),
@@ -236,6 +268,8 @@ impl<'a> Generator<'a> {
             AST::Function(name, vars, body) => self.gen_function_code(&name, vars, *body),
             AST::Call(name, vars) => self.gen_call_code(&name, vars),
             AST::If(cond, then, el) => self.gen_if_code(*cond, *then, *el),
+            AST::Loop(expr) => self.gen_loop_code(*expr),
+            AST::Break => self.gen_break_code(),
             AST::Statement(x) => {
                 let mut a = self.gen_val_code(0);
                 for i in x {
@@ -243,7 +277,7 @@ impl<'a> Generator<'a> {
                 }
                 a
             }
-            _ => panic!(""),
+            x => panic!("{:?}", x),
         }
     }
 
