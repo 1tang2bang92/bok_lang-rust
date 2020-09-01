@@ -167,15 +167,15 @@ impl<'a> Generator<'a> {
         self.builder.build_conditional_branch(cond, then_block, else_block);
 
         self.builder.position_at_end(then_block);
-        let thenv = unsafe {(self as *mut Self).as_mut().unwrap()}.gen_code(then);
+        let thenv = self.gen_code(then);
         self.builder.build_unconditional_branch(merge_block);
 
         let then_block = self.builder.get_insert_block().unwrap();
 
         let mut elsev = None;
         if !el.is_none() {
-            unsafe {(self as *mut Self).as_mut().unwrap()}.builder.position_at_end(else_block);
-            elsev = Some(unsafe {(self as *mut Self).as_mut().unwrap()}.gen_code(el));
+            self.builder.position_at_end(else_block);
+            elsev = Some(self.gen_code(el));
         }
         self.builder.build_unconditional_branch(merge_block);
 
@@ -205,9 +205,9 @@ impl<'a> Generator<'a> {
             AST::Call(name, vars) => self.gen_call_code(&name, vars),
             AST::If(cond, then, el) => self.gen_if_code(*cond, *then, *el),
             AST::Statement(x) => {
-                let mut a = unsafe {(self as *mut Self).as_mut().unwrap()}.gen_val_code(0);
+                let mut a = self.gen_val_code(0);
                 for i in x {
-                    a = unsafe {(self as *mut Self).as_mut().unwrap()}.gen_code(i);
+                    a = self.gen_code(i);
                 }
                 a
             }
