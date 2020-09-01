@@ -2,10 +2,12 @@
 #![allow(unused)]
 
 use std::fs::File;
+use std::path::Path;
 use std::{ffi::CString, io::prelude::*};
 
 use inkwell::builder::*;
 use inkwell::context::*;
+use inkwell::passes::*;
 use inkwell::targets::*;
 use inkwell::*;
 
@@ -36,12 +38,23 @@ fn main() {
     }
 
     let context = Context::create();
+    let builder = context.create_builder();
+    let module = context.create_module("Entry");
 
-    let mut generator = Generator::new(
-        &context,
-        context.create_builder(),
-        context.create_module("Entry"),
-    );
+    let fpm = PassManager::create(&module);
+
+    fpm.add_instruction_combining_pass();
+    fpm.add_reassociate_pass();
+    fpm.add_gvn_pass();
+    fpm.add_cfg_simplification_pass();
+    fpm.add_basic_alias_analysis_pass();
+    fpm.add_promote_memory_to_register_pass();
+    fpm.add_instruction_combining_pass();
+    fpm.add_reassociate_pass();
+
+    fpm.initialize();
+
+    let mut generator = Generator::new(&context, builder, module, fpm);
 
     let mut f = File::open("test.bs").expect("File Open Error");
 
@@ -71,12 +84,23 @@ fn main() {
     if display_compiler_output {
         let mut module = generator.get_module();
         module.print_to_file("output.ir");
-        println!("{:?}", module.print_to_string());
+        module.print_to_stderr();
     }
 
-    /*let triple = TargetMachine::get_default_triple();
+    let triple = TargetMachine::get_default_triple();
+    generator.get_module().set_triple(&triple);
     //let triple = TargetTriple::create("x86_64-unknown-linux-gnu");
-    println!("{:?}", &triple);
+    //println!("{:?}", &triple);
+
+    let config = InitializationConfig {
+        asm_parser: true,
+        asm_printer: true,
+        base: true,
+        disassembler: true,
+        info: true,
+        machine_code: true,
+    };
+    Target::initialize_native(&config);
 
     let target = Target::from_triple(&triple).unwrap();
     let cpu = "generic";
@@ -84,5 +108,13 @@ fn main() {
     let level = OptimizationLevel::Default;
     let reloc_mode = RelocMode::Default;
     let code_model = CodeModel::Default;
-    let targetmachine = target.create_target_machine(&triple, cpu, features, level, reloc_mode, code_model).unwrap();*/
+    let targetmachine = target
+        .create_target_machine(&triple, cpu, features, level, reloc_mode, code_model)
+        .unwrap();
+
+    let engin = generator.get_module().create_jit_execution_engine(OptimizationLevel::Default).unwrap();
+    let target_data = engin.get_target_data();
+    generator.get_module().set_data_layout(&target_data.get_data_layout());
+    targetmachine.add_analysis_passes(generator.get_passmanager());
+    targetmachine.write_to_file(generator.get_module(), FileType::Object, Path::new("output.o"));
 }

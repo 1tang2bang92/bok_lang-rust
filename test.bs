@@ -1,7 +1,7 @@
-fn main() {
-    
-}
-
-fn test(a) {
-    let b = if a == 0 1 else 0
+fn fibo(a) {
+    if (a == 0) {
+        1
+    } else {
+        fibo(a - 1) * a
+    }
 }

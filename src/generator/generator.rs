@@ -5,35 +5,47 @@ use crate::Operator;
 use crate::Type;
 use crate::Value;
 
-use inkwell::*;
+use inkwell::basic_block::*;
 use inkwell::builder::*;
 use inkwell::context::*;
-use inkwell::values::*;
-use inkwell::types::*;
-use inkwell::basic_block::*;
 use inkwell::module::*;
+use inkwell::passes::*;
+use inkwell::types::*;
+use inkwell::values::*;
 use inkwell::AddressSpace;
+use inkwell::*;
 
 pub struct Generator<'a> {
     context: &'a Context,
     builder: Builder<'a>,
     module: Module<'a>,
+    fpm: PassManager<FunctionValue<'a>>,
     named_values: HashMap<String, PointerValue<'a>>,
     tmp_values: Vec<Box<dyn AnyValue<'a> + 'a>>,
 }
 
 impl<'a> Generator<'a> {
-    pub fn new(context: &'a Context, builder: Builder<'a>, module: Module<'a>) -> Self {
+    pub fn new(
+        context: &'a Context,
+        builder: Builder<'a>,
+        module: Module<'a>,
+        fpm: PassManager<FunctionValue<'a>>,
+    ) -> Self {
         Self {
             context: &context,
             builder: builder,
             module: module,
+            fpm: fpm,
             named_values: HashMap::new(),
             tmp_values: Vec::new(),
         }
     }
 
-    fn create_entry_block_alloca(&mut self, function: &FunctionValue, var_name: &str) -> PointerValue<'a> {
+    fn create_entry_block_alloca(
+        &mut self,
+        function: &FunctionValue,
+        var_name: &str,
+    ) -> PointerValue<'a> {
         let mut bb = function.get_first_basic_block().unwrap();
         let fi = bb.get_first_instruction();
         if fi.is_some() {
@@ -87,37 +99,40 @@ impl<'a> Generator<'a> {
         } else {
             let lhs: IntValue<'a> = self.gen_code(l);
             let rhs: IntValue<'a> = self.gen_code(r);
-    
+
             let val: IntValue<'a> = match op {
                 Operator::Add => self.builder.build_int_add(lhs, rhs, "addtmp"),
                 Operator::Sub => self.builder.build_int_sub(lhs, rhs, "subtmp"),
                 Operator::Mul => self.builder.build_int_mul(lhs, rhs, "multmp"),
                 Operator::Div => self.builder.build_int_signed_div(lhs, rhs, "divtmp"),
-                Operator::Equal => self.builder.build_int_compare(IntPredicate::EQ, lhs, rhs, "comptmp"),
+                Operator::Equal => {
+                    self.builder
+                        .build_int_compare(IntPredicate::EQ, lhs, rhs, "comptmp")
+                }
                 _ => panic!(""),
             };
             val
-        }        
+        }
     }
 
     fn gen_function_code(&mut self, name: &str, vars: Vec<AST>, body: AST) -> IntValue<'a> {
-
         let mut arr = Vec::new();
-        for x in 0 .. vars.len() {
+        for _ in &vars {
             arr.push(BasicTypeEnum::IntType(self.context.i64_type()));
         }
 
-        let function_type = self.context.i64_type().fn_type(arr.as_slice(), true);
+        let function_type = self.context.i64_type().fn_type(arr.as_slice(), false);
 
-        let function = self.module.add_function(&name, function_type, Some(Linkage::Internal));
+        let function = self
+            .module
+            .add_function(&name, function_type, Some(Linkage::External));
 
         let basic_block = self.context.append_basic_block(function, "entry");
         self.builder.position_at_end(basic_block);
 
-
         let mut args = Vec::new();
         for x in vars {
-            if let AST::Variable(id, _, _) = x{
+            if let AST::Variable(id, _, _) = x {
                 args.push(id);
             }
         }
@@ -144,27 +159,44 @@ impl<'a> Generator<'a> {
     fn gen_call_code(&mut self, name: &str, vars: Vec<AST>) -> IntValue<'a> {
         let function = self.module.get_function(&name).unwrap();
 
-        if function.get_params().len() != vars.len() {
-
-        }
+        if function.get_params().len() != vars.len() {}
         let mut arr = Vec::new();
         for x in vars {
-            arr.push(BasicValueEnum::IntValue(self.gen_code(x).as_any_value_enum().into_int_value()));
+            arr.push(BasicValueEnum::IntValue(
+                self.gen_code(x).as_any_value_enum().into_int_value(),
+            ));
         }
 
-        self.builder.build_call(function, arr.as_slice(), "calltmp").as_any_value_enum().into_int_value()
+        self.builder
+            .build_call(function, arr.as_slice(), "calltmp")
+            .as_any_value_enum()
+            .into_int_value()
     }
 
     fn gen_if_code(&mut self, condition: AST, then: AST, el: AST) -> IntValue<'a> {
-        let cond = self.gen_code(condition).as_any_value_enum().into_int_value();
-        let cond = self.builder.build_int_compare(IntPredicate::NE, cond, self.context.bool_type().const_zero(), "ifcondition");
+        let cond = self
+            .gen_code(condition)
+            .as_any_value_enum()
+            .into_int_value();
+        let cond = self.builder.build_int_compare(
+            IntPredicate::NE,
+            cond,
+            self.context.bool_type().const_zero(),
+            "ifcondition",
+        );
 
-        let function = self.builder.get_insert_block().unwrap().get_parent().unwrap();
+        let function = self
+            .builder
+            .get_insert_block()
+            .unwrap()
+            .get_parent()
+            .unwrap();
         let then_block = self.context.append_basic_block(function, "then");
         let else_block = self.context.insert_basic_block_after(then_block, "else");
         let merge_block = self.context.insert_basic_block_after(else_block, "murge");
 
-        self.builder.build_conditional_branch(cond, then_block, else_block);
+        self.builder
+            .build_conditional_branch(cond, then_block, else_block);
 
         self.builder.position_at_end(then_block);
         let thenv = self.gen_code(then);
@@ -180,7 +212,7 @@ impl<'a> Generator<'a> {
         self.builder.build_unconditional_branch(merge_block);
 
         let else_block = self.builder.get_insert_block().unwrap();
-        
+
         self.builder.position_at_end(merge_block);
         let phi = self.builder.build_phi(self.context.i64_type(), "iftmp");
 
@@ -217,5 +249,9 @@ impl<'a> Generator<'a> {
 
     pub fn get_module(&mut self) -> &mut Module<'a> {
         &mut self.module
+    }
+
+    pub fn get_passmanager(&mut self) -> &mut PassManager<FunctionValue<'a>> {
+        &mut self.fpm
     }
 }
