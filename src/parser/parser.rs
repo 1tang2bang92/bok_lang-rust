@@ -141,6 +141,18 @@ impl Parser {
         AST::Call(s, vec)
     }
 
+    fn parse_break_expression(&mut self) -> AST {
+        if self.buf.has_next() {
+            if let Token::ReservedWord(ReservedWord::SemiCollon) = self.buf.next().unwrap() {
+                AST::Break(Box::new(AST::None))
+            } else {
+                AST::Break(Box::new(self.statement()))
+            }
+        } else {
+            AST::Break(Box::new(AST::None))
+        }
+    }
+
     fn factor(&mut self) -> AST {
         while self.buf.has_next() {
             let tok = self.buf.next().unwrap();
@@ -175,7 +187,7 @@ impl Parser {
                         return AST::None;
                     }
                     ReservedWord::Break => {
-                        return AST::Break;
+                        return self.parse_break_expression();
                     }
                     ReservedWord::LParen => {
                         return self.parse_paran_expression();

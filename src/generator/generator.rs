@@ -245,7 +245,7 @@ impl<'a> Generator<'a> {
         self.context.i64_type().const_zero()
     }
 
-    fn gen_break_code(&mut self) -> IntValue<'a> {
+    fn gen_break_code(&mut self, stat: AST) -> IntValue<'a> {
         let function = self
             .builder
             .get_insert_block()
@@ -256,7 +256,11 @@ impl<'a> Generator<'a> {
         //let end_loop_block = function.get_basic_blocks().;
 
         self.builder.build_unconditional_branch(end_loop_block);
-        self.context.i64_type().const_zero()
+        if stat.is_none() {
+            self.context.i64_type().const_zero()
+        } else {
+            self.gen_code(stat)
+        }
     }
 
     pub fn gen_code(&mut self, ast: AST) -> IntValue<'a> {
@@ -269,7 +273,7 @@ impl<'a> Generator<'a> {
             AST::Call(name, vars) => self.gen_call_code(&name, vars),
             AST::If(cond, then, el) => self.gen_if_code(*cond, *then, *el),
             AST::Loop(expr) => self.gen_loop_code(*expr),
-            AST::Break => self.gen_break_code(),
+            AST::Break(stat) => self.gen_break_code(*stat),
             AST::Statement(x) => {
                 let mut a = self.gen_val_code(0);
                 for i in x {

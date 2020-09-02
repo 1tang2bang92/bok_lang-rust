@@ -13,7 +13,7 @@ pub enum AST {
     If(Box<AST>, Box<AST>, Box<AST>),
     Loop(Box<AST>),
     Statement(Vec<AST>),
-    Break,
+    Break(Box<AST>),
     None,
 }
 
