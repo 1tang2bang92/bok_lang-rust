@@ -3,12 +3,7 @@
 만든날이 광복절이라 bok lang(복어)로 만듦.
 
 ### feature / 특징
-* ; 없음
 * 문단 {} 로 구분
-* 타입 추론(에정)
-* smart pointer (예정)
-* 버퍼 안정성(예정)
-* utf-8 코딩(예정)
 * 
 
 ### programming paradigm / 프로그래밍 패러다임
@@ -17,9 +12,7 @@
 
 ### data type / 데이터 타입
 ***
-* string
 * int
-* float
 
 ### operator / 연산자
 ***
