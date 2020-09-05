@@ -5,6 +5,11 @@
 int64_t fibo(int64_t);
 
 int main() {
-    printf("%ld\n", fibo(10));
+    long long input = 0;
+    for (;;) {
+        scanf("%lld", &input);
+        printf("%ld\n", fibo(input));
+    }
+    
     return 0;
 }
