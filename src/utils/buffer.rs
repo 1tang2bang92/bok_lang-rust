@@ -27,18 +27,28 @@ impl<T: Clone> Buffer<T> {
         }
     }
 
-    pub fn next(&mut self) -> Option<T> {
+    pub fn prev(&mut self) -> Option<T> {
+        self.cur -= 1;
         let item = self.vec.get(self.cur);
-        self.cur += 1;
         if let Some(x) = item {
             Some(x.clone())
         } else {
             None
         }
     }
-    pub fn prev(&mut self) -> Option<T> {
-        self.cur -= 1;
+
+    pub fn cur(&mut self) -> Option<T> {
         let item = self.vec.get(self.cur);
+        if let Some(x) = item {
+            Some(x.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn next(&mut self) -> Option<T> {
+        let item = self.vec.get(self.cur);
+        self.cur += 1;
         if let Some(x) = item {
             Some(x.clone())
         } else {

@@ -2,13 +2,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-int64_t fibo(int64_t);
+int64_t foo();
 
 int main() {
     long long input = 0;
     for (;;) {
-        scanf("%lld", &input);
-        printf("%lld\n", fibo(input));
+        //scanf("%lld", &input);
+        printf("%ld\n", foo());
     }
     
     return 0;

@@ -85,10 +85,6 @@ impl Parser {
         AST::Function(id, vec, Box::new(self.statement()))
     }
 
-    fn parse_loop_expression(&mut self) -> AST {
-        return AST::Loop(Box::new(self.statement()));
-    }
-
     fn parse_if_expression(&mut self) -> AST {
         let none = AST::None;
         let condition = self.expression();
@@ -141,11 +137,16 @@ impl Parser {
         AST::Call(s, vec)
     }
 
+    fn parse_loop_expression(&mut self) -> AST {
+        return AST::Loop(Box::new(self.statement()));
+    }
+
     fn parse_break_expression(&mut self) -> AST {
         if self.buf.has_next() {
             if let Token::ReservedWord(ReservedWord::SemiCollon) = self.buf.next().unwrap() {
                 AST::Break(Box::new(AST::None))
             } else {
+                self.buf.prev();
                 AST::Break(Box::new(self.statement()))
             }
         } else {

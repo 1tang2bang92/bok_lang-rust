@@ -108,7 +108,27 @@ impl<'a> Generator<'a> {
                 Operator::Equal => {
                     self.builder
                         .build_int_compare(IntPredicate::EQ, lhs, rhs, "comptmp")
-                }
+                },
+                Operator::NE => {
+                    self.builder
+                        .build_int_compare(IntPredicate::NE, lhs, rhs, "comptmp")
+                },
+                Operator::GT => {
+                    self.builder
+                        .build_int_compare(IntPredicate::SGT, lhs, rhs, "comptmp")
+                },
+                Operator::GTE => {
+                    self.builder
+                        .build_int_compare(IntPredicate::SGE, lhs, rhs, "comptmp")
+                },
+                Operator::LT => {
+                    self.builder
+                        .build_int_compare(IntPredicate::SLT, lhs, rhs, "comptmp")
+                },
+                Operator::LTE => {
+                    self.builder
+                        .build_int_compare(IntPredicate::SLE, lhs, rhs, "comptmp")
+                },
                 _ => panic!(""),
             };
             val
@@ -208,8 +228,8 @@ impl<'a> Generator<'a> {
         if !el.is_none() {
             self.builder.position_at_end(else_block);
             elsev = Some(self.gen_code(el));
-            self.builder.build_unconditional_branch(merge_block);
         }
+        self.builder.build_unconditional_branch(merge_block);
 
         let else_block = self.builder.get_insert_block().unwrap();
 
@@ -238,11 +258,14 @@ impl<'a> Generator<'a> {
         //let end_loop_block = self.context.append_basic_block(function, "endloop");
         self.builder.position_at_end(loop_block);
 
-        self.gen_code(expr);
+        let result = self.gen_code(expr);
+        let end_loop_block = self.builder.get_insert_block().unwrap();
+        //self.builder.position_at_end(loop_block);
         self.builder.build_unconditional_branch(loop_block);
 
+        self.builder.position_at_end(end_loop_block);
         
-        self.context.i64_type().const_zero()
+        result
     }
 
     fn gen_break_code(&mut self, stat: AST) -> IntValue<'a> {
@@ -256,6 +279,7 @@ impl<'a> Generator<'a> {
         //let end_loop_block = function.get_basic_blocks().;
 
         self.builder.build_unconditional_branch(end_loop_block);
+        self.builder.position_at_end(end_loop_block);
         if stat.is_none() {
             self.context.i64_type().const_zero()
         } else {

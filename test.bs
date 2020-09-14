@@ -1,7 +1,9 @@
-fn fibo(a) {
-    if (a == 0) {
-        1 
-    } else {
-        fibo(a - 1) * a
-    } 
+fn foo() {
+    let a = 0
+    loop {
+        if a == 10 {
+            break 10
+        }
+        a = a + 1
+    }
 }
