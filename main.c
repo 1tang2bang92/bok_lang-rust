@@ -8,7 +8,7 @@ int main() {
     long long input = 0;
     for (;;) {
         scanf("%lld", &input);
-        printf("%ld\n", fibo(input));
+        printf("%lld\n", fibo(input));
     }
     
     return 0;

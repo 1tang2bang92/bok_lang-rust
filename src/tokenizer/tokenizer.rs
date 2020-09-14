@@ -1,16 +1,8 @@
 use crate::buffer::*;
 use crate::token::*;
 
-#[derive(Clone, Debug)]
-struct SourceLocation {
-    line: i32,
-    col: i32,
-}
-
 pub struct Tokenizer {
     lastChar: char,
-    curLoc: SourceLocation,
-    lexLoc: SourceLocation,
     toks: Vec<Token>,
     buf: Buffer<char>,
 }
@@ -19,12 +11,8 @@ impl Tokenizer {
     pub fn new() -> Self {
         let lastChar = ' ';
         let toks = Vec::new();
-        let curLoc = SourceLocation { col: 0, line: 0 };
-        let lexLoc = SourceLocation { col: 1, line: 0 };
         let buf = Buffer::default();
         Self {
-            curLoc,
-            lexLoc,
             lastChar,
             toks,
             buf,
@@ -78,14 +66,7 @@ impl Tokenizer {
 
     pub fn advance(&mut self) -> char {
         let LastChar = self.getchar();
-
-        if (LastChar == '\n' || LastChar == '\r') {
-            self.lexLoc.line += 1;
-            self.lexLoc.col = 0;
-        } else {
-            self.lexLoc.col += 1;
-        }
-        return LastChar;
+        LastChar
     }
 
     pub fn gettok(&mut self) -> Token {
@@ -93,7 +74,6 @@ impl Tokenizer {
             self.lastChar = self.advance();
         }
 
-        self.curLoc = self.lexLoc.clone();
         if self.lastChar.is_alphabetic() {
             let mut s = String::new();
             s.push(self.lastChar);
